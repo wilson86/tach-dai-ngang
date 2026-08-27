@@ -59,7 +59,8 @@ try {
   if ($LASTEXITCODE -ne 0) { throw 'Regression thất bại; không commit hoặc push ZIP mới.' }
 
   Invoke-Git add -A
-  $staged = (& git -C $repoRoot diff --cached --quiet; $LASTEXITCODE)
+  & git -C $repoRoot diff --cached --quiet
+  $staged = $LASTEXITCODE
   if ($staged -ne 0) {
     Invoke-Git commit -m ("Tach Dai Ngang sync " + $latestZip.BaseName)
     Invoke-Git push origin main
