@@ -1,0 +1,23 @@
+TÁCH ĐÀI NGANG - PROJECT RIÊNG
+
+TOOL CŨ - GIỮ NGUYÊN:
+Local:  F:\KTS\TachDaiMobile
+GitHub: https://github.com/wilson86/tach-dai-mobile
+Web:    https://wilson86.github.io/tach-dai-mobile/
+
+TOOL MỚI:
+Local đề xuất:  F:\KTS\TachDaiNgang
+GitHub đề xuất: https://github.com/wilson86/tach-dai-ngang
+Web đề xuất:    https://wilson86.github.io/tach-dai-ngang/
+
+RULE TOOL MỚI:
+- DX/ĐX/DA/ĐÁ: tách đài kiểu cũ.
+- XC/X: giữ nguyên.
+- B/DD/ĐĐ/BAO/ĐẦU/ĐUÔI/LÔ/...: không tách đài, cắt ngang 2 dòng, mỗi dòng 1/2 SL.
+- Ví dụ:
+  3d 68 69 70 b 30 dd 60
+  =>
+  3d 68 69 70 b 15 dd 30
+  3d 68 69 70 b 15 dd 30
+
+Không dùng repo tach-dai-mobile để publish tool mới.
