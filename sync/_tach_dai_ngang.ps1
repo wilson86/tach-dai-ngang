@@ -9,9 +9,9 @@ $expectedRemote = 'https://github.com/wilson86/tach-dai-ngang.git'
 $downloads = Join-Path $env:USERPROFILE 'Downloads'
 
 function Invoke-Git {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
-  & git -C $repoRoot @Arguments
-  if ($LASTEXITCODE -ne 0) { throw "git $($Arguments -join ' ') thất bại." }
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GitArguments)
+  & git -C $repoRoot @GitArguments
+  if ($LASTEXITCODE -ne 0) { throw "git $($GitArguments -join ' ') thất bại." }
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot '.git'))) {
