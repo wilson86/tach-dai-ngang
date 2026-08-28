@@ -77,7 +77,7 @@ async function main() {
   );
   assert.deepEqual(
     Array.from(rules.processLine("3d 38 b5n", "mt", mtSaturday)),
-    ["3d 38 b2.5n", "3d 38 b2.5n"]
+    ["3d 38 b2n", "3d 38 b3n"]
   );
 
   // XC/X không tách đài và không chia số lượng.
@@ -100,7 +100,10 @@ async function main() {
   assert.equal(rules.normalizeInput("Bến Tre Bạc Liêu Đà Nẵng Đắk Nông Quảng Ngãi bl"), "bt bli dn dno qn bli");
   assert.equal(rules.normalizeInput("ben tre bac lieu da nang dak nong quang ngai"), "bt bli dn dno qn");
   assert.doesNotThrow(() => rules.validateCheckOnlyLine("hue 71 dathang 2n", "mt", rules.getSchedule("mt", sunday)));
-  assert.equal(Array.from(rules.processLine("tp 31 91 b10n da 5n", "mn", mnMonday))[0], "tp 31 91 b10n dat 5n");
+  assert.deepEqual(
+    Array.from(rules.processLine("tp 31 91 b10n da 5n", "mn", mnMonday)),
+    ["tp 31 91 b5n dat 2n", "tp 31 91 b5n dat 3n"]
+  );
   expectThrow(() => rules.validateCheckOnlyLine("tp 31 91 dx 5n", "mn", mnMonday), /1 đài 'tp' phải dùng 'dat'/);
   const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n\n79 58 97 da 2n\n[8/23/2026 5:32 PM] Vinh: 1\n[8/23/2026 5:32 PM] Hiền: 25 52 50 da 2n`;
   assert.equal(rules.preprocessChatText(chat), "20 89 98 da 2n\n79 58 97 da 2n\n25 52 50 da 2n");
