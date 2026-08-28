@@ -1,0 +1,12 @@
+Tách Đài Ngang v1.0.2
+
+RULE:
+- Số lượng lẻ không dùng .5:
+  7 -> 3 + 4
+  5 -> 2 + 3
+- B/DD/các cược thường: cắt ngang floor/ceil.
+- DA/ĐÁ/DAT/DATHANG: cắt ngang chỉ khi amount >= 5.
+  <5 giữ nguyên.
+- XC/X: giữ nguyên.
+- DX/ĐX: tách đài kiểu cũ.
+- Tool cũ tach-dai-mobile không thay đổi.

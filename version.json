@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "updated": "2026-08-27",
+  "version": "1.0.2",
+  "updated": "2026-08-28",
   "app": "tach-dai-ngang",
-  "notes": "ĐX/DA giữ tách đài cũ; XC giữ nguyên; B/DD/cược thường cắt ngang 2 dòng, mỗi dòng 1/2 SL."
+  "notes": "Integer floor/ceil split: 7->3+4; DA/DAT/DATHANG split only when amount>=5; XC unchanged; DX keeps old station split."
 }

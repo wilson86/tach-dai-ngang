@@ -68,7 +68,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.0</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.2</span></div>
 
   <div class="card">
     <div class="controls">
@@ -495,16 +495,14 @@ function splitDxFromNormal(group){
   const toks=group.split(/\s+/).filter(Boolean);
   if(!toks.length) return [];
 
-  let i=0;
-  const nums=[];
+  let i=0, nums=[];
   while(i<toks.length && isNumberToken(toks[i]) && !isBetType(toks[i])){
-    nums.push(toks[i]);
-    i++;
+    nums.push(toks[i]); i++;
   }
   if(!nums.length || i>=toks.length) return [group];
 
   const horizontal=[],xc=[],dx=[];
-  const dxTypes=new Set(["dx","đx","da","đá","dat","dathang"]);
+  const dxTypes=new Set(["dx","đx"]);
   const xcTypes=new Set(["xc","x"]);
 
   while(i<toks.length){
@@ -516,14 +514,11 @@ function splitDxFromNormal(group){
       if(dxTypes.has(bet)) dx.push(tok);
       else if(xcTypes.has(bet)) xc.push(tok);
       else horizontal.push(tok);
-      i++;
-      continue;
+      i++; continue;
     }
 
     if(!isBetType(tok)){
-      horizontal.push(tok);
-      i++;
-      continue;
+      horizontal.push(tok); i++; continue;
     }
 
     const bet=tok;
@@ -534,7 +529,7 @@ function splitDxFromNormal(group){
     i+=money?2:1;
   }
 
-  const prefix=nums.join(" "),out=[];
+  const prefix=nums.join(" "), out=[];
   if(horizontal.length) out.push(`${prefix} ${horizontal.join(" ")}`);
   if(xc.length) out.push(`${prefix} ${xc.join(" ")}`);
   if(dx.length) out.push(`${prefix} ${dx.join(" ")}`);
@@ -548,7 +543,7 @@ function splitBetChunks(rest){
 }
 function chunkMode(chunk){
   const toks=chunk.split(/\s+/).filter(Boolean);
-  const dxTypes=new Set(["dx","đx","da","đá","dat","dathang"]);
+  const dxTypes=new Set(["dx","đx"]);
   const xcTypes=new Set(["xc","x"]);
   const bets=[];
 
@@ -563,27 +558,48 @@ function chunkMode(chunk){
   return "horizontal";
 }
 
-function halfMoneyToken(tok){
+function parseMoneyToken(tok){
   const m=tok.match(/^(\d+(?:[.,]\d+)?)([a-zA-ZđĐ]?)$/u);
-  if(!m) return tok;
-
-  const comma=m[1].includes(",");
+  if(!m) return null;
   const n=Number(m[1].replace(",","."));
-  if(!Number.isFinite(n)) return tok;
-
-  let out=String(n/2);
-  if(comma) out=out.replace(".",",");
-  return out+m[2];
+  if(!Number.isFinite(n)) return null;
+  return {value:n,suffix:m[2],comma:m[1].includes(",")};
 }
 
-function halveHorizontalChunk(chunk){
+function formatAmount(value,suffix="",comma=false){
+  let out=Number.isInteger(value)?String(value):String(value);
+  if(comma) out=out.replace(".",",");
+  return out+suffix;
+}
+
+function splitAmountFloorCeil(tok){
+  const p=parseMoneyToken(tok);
+  if(!p) return [tok,tok];
+
+  if(Number.isInteger(p.value)){
+    const left=Math.floor(p.value/2);
+    const right=p.value-left;
+    return [
+      formatAmount(left,p.suffix,p.comma),
+      formatAmount(right,p.suffix,p.comma)
+    ];
+  }
+
+  const half=p.value/2;
+  return [
+    formatAmount(half,p.suffix,p.comma),
+    formatAmount(half,p.suffix,p.comma)
+  ];
+}
+
+function splitHorizontalChunkTwo(chunk){
   const toks=chunk.split(/\s+/).filter(Boolean);
-  const out=[];
-  let i=0;
+  const out1=[],out2=[];
+  let i=0,didSplit=false;
+  const daTypes=new Set(["da","đá","dat","dathang"]);
 
   while(i<toks.length && isNumberToken(toks[i]) && !isBetType(toks[i])){
-    out.push(toks[i]);
-    i++;
+    out1.push(toks[i]); out2.push(toks[i]); i++;
   }
 
   while(i<toks.length){
@@ -591,58 +607,67 @@ function halveHorizontalChunk(chunk){
     const compact=splitCompactBetToken(tok);
 
     if(compact){
-      out.push(compact[0]+halfMoneyToken(compact[1]));
-      i++;
-      continue;
+      const [bet,money]=compact;
+      const p=parseMoneyToken(money);
+
+      if(daTypes.has(bet) && p && p.value<5){
+        out1.push(tok); out2.push(tok);
+      }else{
+        const [m1,m2]=splitAmountFloorCeil(money);
+        out1.push(bet+m1); out2.push(bet+m2); didSplit=true;
+      }
+      i++; continue;
     }
 
     if(isBetType(tok)){
-      out.push(tok);
+      const bet=tok;
+      out1.push(bet); out2.push(bet);
+
       if(i+1<toks.length){
-        out.push(halfMoneyToken(toks[i+1]));
+        const money=toks[i+1];
+        const p=parseMoneyToken(money);
+
+        if(daTypes.has(bet) && p && p.value<5){
+          out1.push(money); out2.push(money);
+        }else{
+          const [m1,m2]=splitAmountFloorCeil(money);
+          out1.push(m1); out2.push(m2); didSplit=true;
+        }
         i+=2;
-      }else{
-        i++;
-      }
+      }else i++;
       continue;
     }
 
-    out.push(tok);
-    i++;
+    out1.push(tok); out2.push(tok); i++;
   }
 
-  return out.join(" ");
+  return [out1.join(" "),out2.join(" "),didSplit];
 }
 
 function expandChunk(selector,chunk,region,stations){
   const mode=chunkMode(chunk);
 
-  // XC: giữ nguyên.
   if(mode==="xc") return [`${selector} ${chunk}`];
 
-  // B/DD/...: cắt ngang đúng 2 dòng, chia SL 1/2.
   if(mode==="horizontal"){
-    const half=halveHorizontalChunk(chunk);
-    const line=`${selector} ${half}`;
-    return [line,line];
+    const [c1,c2,didSplit]=splitHorizontalChunkTwo(chunk);
+    if(!didSplit) return [`${selector} ${chunk}`];
+    return [`${selector} ${c1}`,`${selector} ${c2}`];
   }
 
-  // DX/DA: giữ nguyên cách tách đài của tool cũ.
+  // DX/ĐX old station split
   if(!stations.length) return [`${selector} ${chunk}`];
-
-  const main=stations.slice(0,2);
-
   if(selector==="2d") return [`2d ${chunk}`];
   if(stations.length<3) return [`${selector} ${chunk}`];
 
   const n=selector==="3d"?3:4;
   const selected=stations.slice(0,Math.min(n,stations.length));
-  const main2=selected.slice(0,2);
+  const main=selected.slice(0,2);
   const aux=selected.slice(2);
 
   const out=[`2d ${chunk}`];
   for(const a of aux){
-    for(const m of main2){
+    for(const m of main){
       out.push(`${m[0]} ${a[0]} ${chunk}`);
     }
   }
@@ -664,8 +689,26 @@ function processLine(line,region,stations){
     if(toks.length && valid.has(toks[0])){
       const stationCount=(toks.length>1 && valid.has(toks[1]))?2:1;
       if(stationCount===1){
+        const station=toks[0];
         const rest=normalizeOneStationDaPayload(toks.slice(1).join(" "));
-        return [`${toks[0]} ${rest}`.trim()];
+        const chunks=splitBetChunks(rest);
+        const out=[];
+
+        for(const chunk of chunks){
+          const mode=chunkMode(chunk);
+
+          if(mode==="xc"){
+            out.push(`${station} ${chunk}`);
+          }else if(mode==="horizontal"){
+            const [c1,c2,didSplit]=splitHorizontalChunkTwo(chunk);
+            if(didSplit) out.push(`${station} ${c1}`,`${station} ${c2}`);
+            else out.push(`${station} ${chunk}`);
+          }else{
+            out.push(`${station} ${chunk}`);
+          }
+        }
+
+        return out.length?out:[`${station} ${rest}`.trim()];
       }
     }
     return [s];
@@ -1040,7 +1083,7 @@ loadSettings();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.2";
 let swRegistration = null;
 
 async function checkForAppUpdate() {

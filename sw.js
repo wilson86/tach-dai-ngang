@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.0";
+const CACHE_NAME = "tach-dai-ngang-v1.0.2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -35,7 +35,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.0"}), {
+        new Response(JSON.stringify({version:"1.0.2"}), {
           headers: { "Content-Type": "application/json" }
         })
       )

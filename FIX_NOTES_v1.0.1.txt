@@ -1,0 +1,4 @@
+Tách Đài Ngang v1.0.1
+- 1 đài + B/DD/cược thường: cắt ngang 2 dòng, chia SL 1/2.
+- 1 đài + XC: giữ nguyên.
+- 1 đài + DA/ĐÁ: DAT, giữ nguyên.
