@@ -105,10 +105,56 @@ async function main() {
     ["tp 31 91 b5n dat 2n", "tp 31 91 b5n dat 3n"]
   );
   expectThrow(() => rules.validateCheckOnlyLine("tp 31 91 dx 5n", "mn", mnMonday), /1 đài 'tp' phải dùng 'dat'/);
-  const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n\n79 58 97 da 2n\n[8/23/2026 5:32 PM] Vinh: 1\n[8/23/2026 5:32 PM] Hiền: 25 52 50 da 2n`;
-  assert.equal(rules.preprocessChatText(chat), "20 89 98 da 2n\n79 58 97 da 2n\n1\n25 52 50 da 2n");
+  const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n
+79 58 97 da 2n
+[8/23/2026 5:32 PM] Vinh: 1
+88 99 b 5n
+[8/23/2026 5:33 PM] Hiền: 25 52 50 da 2n`;
+assert.equal(
+  rules.preprocessChatText(chat),
+  "20 89 98 da 2n\n79 58 97 da 2n\n25 52 50 da 2n"
+);
+assert.equal(rules.preprocessChatText(`Hiền:
+20 89 98 da 2n`), "20 89 98 da 2n");
+assert.equal(rules.preprocessChatText(`Hiền: 20 89 98 da 2n`), "20 89 98 da 2n");
+assert.equal(rules.preprocessChatText(`Vinh:
+20 89 98 da 2n
+79 58 97 da 2n`), "");
+assert.equal(
+  rules.preprocessChatText(`Hiền, [8/23/2026 5:31 PM]
+20 89 b 2n
+Vinh, [8/23/2026 5:32 PM]
+11 22 b 3n
+Quýt, [8/23/2026 5:33 PM]
+30 40 dd 4n`),
+  "20 89 b 2n\n30 40 dd 4n"
+);
 
-  // MB chỉ kiểm tra, không tách/cắt ngang.
+// Engine Ngang: 2 đài cụ thể cược thường -> 2d rồi chia.
+assert.deepEqual(
+  Array.from(rules.processLine("Dna +qn 17 b30n", "mt", mtSaturday)),
+  ["2d 17 b15n", "2d 17 b15n"]
+);
+assert.deepEqual(
+  Array.from(rules.processLine("Dna +qn 17 b5n", "mt", mtSaturday)),
+  ["2d 17 b2n", "2d 17 b3n"]
+);
+assert.deepEqual(
+  Array.from(rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday)),
+  ["dn qn 17 dx2n"]
+);
+
+// DA/DAT Ngang: >=5 chia; <5 giữ.
+assert.deepEqual(
+  Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
+  ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
+);
+assert.deepEqual(
+  Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
+  ["tp 31 91 dat 4n"]
+);
+
+// MB chỉ kiểm tra, không tách/cắt ngang.
   const mbLine = "79 da 30n";
   assert.doesNotThrow(() => rules.validateCheckOnlyLine(mbLine, "mb", rules.getSchedule("mb", saturday)));
   assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);

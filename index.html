@@ -68,7 +68,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.3</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.4</span></div>
 
   <div class="card">
     <div class="controls">
@@ -100,7 +100,7 @@
       <button id="clearBtn" class="danger">Xóa</button>
     </div>
     <div id="status" class="status"></div>
-    <div class="hint"><b>Chế độ Ngang:</b> ĐX/ĐA tách đài như cũ • XC giữ nguyên • B/DD/cược thường cắt 2 dòng và chia SL 1/2.<br>Nếu dán log chat, tool tự bỏ ngày/giờ, tên người gửi và toàn bộ tin của Vinh trước khi xử lý.</div>
+    <div class="hint"><b>Chế độ Ngang:</b> ĐX tách cũ • XC giữ • cược thường chia ngang • DA/DAT chia khi ≥5.<br>Chat: bỏ ngày/giờ + tên người gửi; riêng <b>Vinh</b> xóa toàn bộ tin/block.</div>
   </div>
 
   <div id="resultCard" class="card result-card">
@@ -148,9 +148,11 @@ const BET_TYPES=new Set([
 ]);
 const DX_TYPES=new Set(["dx","đx","da","đá","dat","dathang"]);
 const TWO_STATION_DA=new Set(["da","đá","dx","đx"]);
-const IGNORED_SENDERS=new Set();
+const IGNORED_SENDERS=new Set(["vinh"]);
 const CHAT_HEADER_RE=/^\[([^\]]+)\]\s*([^:]+?)(?:\s+in\s+reply\s+to\s+[^:]+?)?:\s*(.*)$/i;
-const SIMPLE_SENDER_RE=/^([^:]{1,60}):\s*(.+)$/u;
+const CHAT_SENDER_TIME_RE=/^([^,\[\]:]{1,80}),\s*\[([^\]]+)\]\s*:?\s*(.*)$/i;
+const CHAT_SENDER_PREFIX_RE=/^([^\d:]{1,80}):\s*(.*)$/u;
+const CHAT_METADATA_ONLY_RE=/^(?:[-–—]\s*)?(?:\[\s*)?(?:\d{1,2}[\/.-]\d{1,2}(?:[\/.-]\d{2,4})?(?:[,\s]+(?:\d{1,2}:\d{2}(?:\s*[ap]m)?))?|\d{1,2}:\d{2}(?:\s*[ap]m)?)(?:\s*\])?$/iu;
 const ALL_STATION_CODES=new Set([
   ...Object.values(MN).flat().map(x=>x[0]),
   ...Object.values(MT).flat().map(x=>x[0])
@@ -266,56 +268,54 @@ function normalizeSenderName(s){
 function isSenderPrefix(prefix){
   prefix=normalizeSenderName(prefix);
   if(!prefix || /\d/u.test(prefix)) return false;
-
   const normalized=normalizeInput(prefix);
   if(ALL_STATION_CODES.has(normalized)) return false;
   if(["2d","3d","4d","mn","mt","mb"].includes(normalized)) return false;
   return true;
 }
-function stripSimpleSenderPrefix(line){
-  const m=stripInvisible(line).trim().match(SIMPLE_SENDER_RE);
-  if(!m || !isSenderPrefix(m[1])) return null;
-  return (m[2]||"").trim();
+function parseChatEnvelope(line){
+  let m=line.match(CHAT_HEADER_RE);
+  if(m) return {sender:m[2]||"",body:m[3]||"",metadata:false};
+  m=line.match(CHAT_SENDER_TIME_RE);
+  if(m && isSenderPrefix(m[1])) return {sender:m[1]||"",body:m[3]||"",metadata:false};
+  m=line.match(CHAT_SENDER_PREFIX_RE);
+  if(m && isSenderPrefix(m[1])) return {sender:m[1]||"",body:m[2]||"",metadata:false};
+  if(CHAT_METADATA_ONLY_RE.test(line)) return {sender:null,body:"",metadata:true};
+  return null;
 }
 function looksLikeChatLog(text){
-  return (text||"").split(/\r?\n/).some(raw=>{
-    const line=stripInvisible(raw).trim();
-    return CHAT_HEADER_RE.test(line) || stripSimpleSenderPrefix(line)!==null;
-  });
+  return (text||"").split(/\r?\n/).some(raw=>!!parseChatEnvelope(stripInvisible(raw).trim()));
 }
 function preprocessChatText(text){
   const lines=(text||"").split(/\r?\n/);
   if(!looksLikeChatLog(text)) return text.trim();
-
   const kept=[];
   let insideMessage=false;
+  let currentKeep=true;
 
   for(const raw of lines){
     const line=stripInvisible(raw.replace(/\r$/,"")).trim();
+    if(!line) continue;
 
-    const m=line.match(CHAT_HEADER_RE);
-    if(m){
+    const env=parseChatEnvelope(line);
+    if(env){
+      if(env.metadata) continue;
       insideMessage=true;
-      let body=(m[3]||"").trim().replace(/^\s*>\s*/,"").trim();
-      if(body) kept.push(normalizeInput(body));
-      continue;
-    }
-
-    let body=stripSimpleSenderPrefix(line);
-    if(body!==null){
-      insideMessage=true;
-      body=body.replace(/^\s*>\s*/,"").trim();
+      currentKeep=!IGNORED_SENDERS.has(normalizeSenderName(env.sender));
+      if(!currentKeep) continue;
+      let body=stripInvisible(env.body||"").replace(/^\s*>\s*/,"").trim();
       if(body) kept.push(normalizeInput(body));
       continue;
     }
 
     if(insideMessage){
+      if(!currentKeep) continue;
       const cleaned=line.replace(/^\s*>\s*/,"").trim();
       if(cleaned) kept.push(normalizeInput(cleaned));
       continue;
     }
 
-    if(line) kept.push(normalizeInput(line));
+    kept.push(normalizeInput(line));
   }
   return kept.join("\n").trim();
 }
@@ -1129,7 +1129,7 @@ loadSettings();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.3";
+const APP_VERSION = "1.0.4";
 let swRegistration = null;
 
 async function checkForAppUpdate() {

@@ -1,6 +1,6 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "updated": "2026-08-29",
   "app": "tach-dai-ngang",
-  "notes": "2 đài cụ thể + cược ngang được canonical thành 2d rồi chia; paste chat tự bỏ mọi tên người gửi, giữ nội dung cược."
+  "notes": "Shared rules sync with Tach 3 Mien; Vinh drop whole block. Ngang engine unchanged: DX old split, XC keep, integer floor/ceil, DA>=5 split."
 }
