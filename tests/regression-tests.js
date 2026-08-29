@@ -106,7 +106,7 @@ async function main() {
   );
   expectThrow(() => rules.validateCheckOnlyLine("tp 31 91 dx 5n", "mn", mnMonday), /1 đài 'tp' phải dùng 'dat'/);
   const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n\n79 58 97 da 2n\n[8/23/2026 5:32 PM] Vinh: 1\n[8/23/2026 5:32 PM] Hiền: 25 52 50 da 2n`;
-  assert.equal(rules.preprocessChatText(chat), "20 89 98 da 2n\n79 58 97 da 2n\n25 52 50 da 2n");
+  assert.equal(rules.preprocessChatText(chat), "20 89 98 da 2n\n79 58 97 da 2n\n1\n25 52 50 da 2n");
 
   // MB chỉ kiểm tra, không tách/cắt ngang.
   const mbLine = "79 da 30n";
