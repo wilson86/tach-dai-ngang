@@ -68,7 +68,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.2</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.3</span></div>
 
   <div class="card">
     <div class="controls">
@@ -148,8 +148,13 @@ const BET_TYPES=new Set([
 ]);
 const DX_TYPES=new Set(["dx","đx","da","đá","dat","dathang"]);
 const TWO_STATION_DA=new Set(["da","đá","dx","đx"]);
-const IGNORED_SENDERS=new Set(["vinh"]);
+const IGNORED_SENDERS=new Set();
 const CHAT_HEADER_RE=/^\[([^\]]+)\]\s*([^:]+?)(?:\s+in\s+reply\s+to\s+[^:]+?)?:\s*(.*)$/i;
+const SIMPLE_SENDER_RE=/^([^:]{1,60}):\s*(.+)$/u;
+const ALL_STATION_CODES=new Set([
+  ...Object.values(MN).flat().map(x=>x[0]),
+  ...Object.values(MT).flat().map(x=>x[0])
+]);
 
 const $=id=>document.getElementById(id);
 const regionEl=$("region"), dateEl=$("date"), todayEl=$("today"), scheduleEl=$("schedule");
@@ -258,39 +263,59 @@ function normalizeInput(s){
 function normalizeSenderName(s){
   return stripInvisible(s).trim().toLowerCase().replace(/\s+/g," ");
 }
+function isSenderPrefix(prefix){
+  prefix=normalizeSenderName(prefix);
+  if(!prefix || /\d/u.test(prefix)) return false;
+
+  const normalized=normalizeInput(prefix);
+  if(ALL_STATION_CODES.has(normalized)) return false;
+  if(["2d","3d","4d","mn","mt","mb"].includes(normalized)) return false;
+  return true;
+}
+function stripSimpleSenderPrefix(line){
+  const m=stripInvisible(line).trim().match(SIMPLE_SENDER_RE);
+  if(!m || !isSenderPrefix(m[1])) return null;
+  return (m[2]||"").trim();
+}
 function looksLikeChatLog(text){
-  return (text||"").split(/\r?\n/).some(raw=>CHAT_HEADER_RE.test(stripInvisible(raw).trim()));
+  return (text||"").split(/\r?\n/).some(raw=>{
+    const line=stripInvisible(raw).trim();
+    return CHAT_HEADER_RE.test(line) || stripSimpleSenderPrefix(line)!==null;
+  });
 }
 function preprocessChatText(text){
   const lines=(text||"").split(/\r?\n/);
   if(!looksLikeChatLog(text)) return text.trim();
 
   const kept=[];
-  let currentSender=null,currentKeep=false;
+  let insideMessage=false;
 
   for(const raw of lines){
-    const line=raw.replace(/\r$/,"");
-    const matchLine=stripInvisible(line).trim();
-    const m=matchLine.match(CHAT_HEADER_RE);
+    const line=stripInvisible(raw.replace(/\r$/,"")).trim();
+
+    const m=line.match(CHAT_HEADER_RE);
     if(m){
-      currentSender=normalizeSenderName(m[2]);
-      currentKeep=!IGNORED_SENDERS.has(currentSender);
-      let body=(m[3]||"").trim();
-      if(currentKeep && body){
-        body=stripInvisible(body).replace(/^\s*>\s*/,"").trim();
-        if(body) kept.push(normalizeInput(body));
-      }
+      insideMessage=true;
+      let body=(m[3]||"").trim().replace(/^\s*>\s*/,"").trim();
+      if(body) kept.push(normalizeInput(body));
       continue;
     }
-    if(currentSender!==null){
-      if(!currentKeep) continue;
-      let cleaned=stripInvisible(line).trim();
-      if(!cleaned) continue;
-      cleaned=cleaned.replace(/^\s*>\s*/,"").trim();
+
+    let body=stripSimpleSenderPrefix(line);
+    if(body!==null){
+      insideMessage=true;
+      body=body.replace(/^\s*>\s*/,"").trim();
+      if(body) kept.push(normalizeInput(body));
+      continue;
+    }
+
+    if(insideMessage){
+      const cleaned=line.replace(/^\s*>\s*/,"").trim();
       if(cleaned) kept.push(normalizeInput(cleaned));
       continue;
     }
-    if(line.trim()) kept.push(line.trim());
+
+    if(line) kept.push(normalizeInput(line));
   }
   return kept.join("\n").trim();
 }
@@ -710,6 +735,27 @@ function processLine(line,region,stations){
 
         return out.length?out:[`${station} ${rest}`.trim()];
       }
+
+      if(stationCount===2){
+        const st1=toks[0],st2=toks[1];
+        const rest=toks.slice(2).join(" ");
+        const chunks=splitBetChunks(rest);
+        const out=[];
+
+        for(const chunk of chunks){
+          const mode=chunkMode(chunk);
+
+          if(mode==="horizontal"){
+            // Hai đài cụ thể + cược ngang => canonical selector 2d.
+            out.push(...expandChunk("2d",chunk,region,stations));
+          }else{
+            // XC giữ nguyên; DX/ĐX là cặp đài cụ thể nên giữ nguyên cặp.
+            out.push(`${st1} ${st2} ${chunk}`);
+          }
+        }
+
+        return out.length?out:[s];
+      }
     }
     return [s];
   }
@@ -967,7 +1013,7 @@ function run(){
   if(!raw){outputEl.value="";resetOutputRecords();setStatus("Chưa có tin.","err");return;}
 
   const wasChat=looksLikeChatLog(raw);
-  const clean=wasChat?preprocessChatText(raw):raw;
+  const clean=preprocessChatText(raw);
   if(wasChat&&clean!==raw){
     snapshot();
     inputEl.value=clean;
@@ -1083,7 +1129,7 @@ loadSettings();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.0.3";
 let swRegistration = null;
 
 async function checkForAppUpdate() {

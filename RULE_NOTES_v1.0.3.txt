@@ -1,0 +1,25 @@
+Tách Đài Ngang v1.0.3
+
+FIX 1 - HAI ĐÀI CỤ THỂ:
+Dna +qn 17 b30n
+=> normalize dn qn 17 b30n
+=> hiểu cược ngang là selector 2d
+=> 2d 17 b15n
+   2d 17 b15n
+
+- Cược ngang B/DD/...: hai đài cụ thể -> canonical 2d.
+- DA/DAT >=5 cũng theo horizontal rule.
+- XC giữ nguyên cặp đài.
+- DX/ĐX giữ nguyên cặp đài cụ thể.
+
+FIX 2 - TÊN NGƯỜI GỬI:
+Tự bỏ tên người gửi bất kỳ khi paste:
+Hiền:
+Quýt:
+Trúc Thái:
+Vinh:
+và các tên khác.
+
+Chỉ bỏ metadata/tên, GIỮ nội dung cược.
+
+Tool cũ tach-dai-mobile không thay đổi.
