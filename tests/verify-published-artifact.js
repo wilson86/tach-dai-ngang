@@ -13,6 +13,9 @@ const root = path.resolve(__dirname, "..");
 const base = (process.argv[2] || "https://wilson86.github.io/tach-dai-ngang/").replace(/\/?$/, "/");
 const assets = ["index.html", "sw.js", "version.json"];
 const sha256 = value => crypto.createHash("sha256").update(value).digest("hex");
+// GitHub Pages serves Git's LF-normalised text blobs, while a Windows checkout
+// may use CRLF. Compare the packaged bytes against that canonical publish form.
+const canonicalPublishedBytes = value => Buffer.from(value.toString("utf8").replace(/\r\n/g, "\n"), "utf8");
 
 async function readPublished(name) {
   const response = await fetch(new URL(name, base), { cache: "no-store" });
@@ -23,7 +26,9 @@ async function readPublished(name) {
 async function main() {
   const published = Object.fromEntries(await Promise.all(assets.map(async name => [name, await readPublished(name)])));
   const local = Object.fromEntries(assets.map(name => [name, fs.readFileSync(path.join(root, name))]));
-  for (const name of assets) assert.equal(sha256(published[name]), sha256(local[name]), `${name} artifact hash mismatch`);
+  for (const name of assets) {
+    assert.equal(sha256(published[name]), sha256(canonicalPublishedBytes(local[name])), `${name} artifact hash mismatch`);
+  }
 
   const index = published["index.html"].toString("utf8");
   const version = JSON.parse(published["version.json"].toString("utf8"));
