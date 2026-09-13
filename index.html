@@ -68,7 +68,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.4</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.5</span></div>
 
   <div class="card">
     <div class="controls">
@@ -100,7 +100,7 @@
       <button id="clearBtn" class="danger">Xóa</button>
     </div>
     <div id="status" class="status"></div>
-    <div class="hint"><b>Chế độ Ngang:</b> ĐX tách cũ • XC giữ • cược thường chia ngang • DA/DAT chia khi ≥5.<br>Chat: bỏ ngày/giờ + tên người gửi; riêng <b>Vinh</b> xóa toàn bộ tin/block.</div>
+    <div class="hint"><b>Chế độ Ngang:</b> ĐX tách cũ • XC giữ • mọi cược tách ngang bảo toàn tiền nguyên theo thương + dư.<br>Chat: bỏ ngày/giờ + tên người gửi; riêng <b>Vinh</b> xóa toàn bộ tin/block.</div>
   </div>
 
   <div id="resultCard" class="card result-card">
@@ -137,14 +137,14 @@ const MT = {
   4:[["bd","Bình Định"],["qt","Quảng Trị"],["qb","Quảng Bình"]],
   5:[["gl","Gia Lai"],["nt","Ninh Thuận"]],
   6:[["dn","Đà Nẵng"],["qn","Quảng Ngãi"],["dno","Đắk Nông"]],
-  0:[["hue","Huế"],["kt","Kon Tum"],["kh","Khánh Hòa"]]
+  0:[["kh","Khánh Hòa"],["kt","Kon Tum"],["hue","Huế"]]
 };
 
 const REGION_LABEL={mn:"Miền Nam",mt:"Miền Trung",mb:"Miền Bắc"};
 const BET_TYPES=new Set([
   "b","bao","dd","đđ","xc","x",
   "dx","đx","da","đá","dat","dathang",
-  "d","duoi","đuôi","dau","đầu","lo","lô"
+  "d","duoi","đuôi","dau","đầu","lo","lô","bl"
 ]);
 const DX_TYPES=new Set(["dx","đx","da","đá","dat","dathang"]);
 const TWO_STATION_DA=new Set(["da","đá","dx","đx"]);
@@ -206,7 +206,7 @@ function updateUI(){
   const region=regionEl.value;
   const d=parseLocalDate(dateEl.value||localDateISO());
   const stations=getSchedule(region,d);
-  runBtn.textContent=region==="mb"?"Kiểm tra":"Kiểm tra + Tách";
+  runBtn.textContent="Kiểm tra + Tách";
   scheduleEl.innerHTML=
     `<span class="pill">${REGION_LABEL[region]}</span>`+
     `<span class="pill">${weekdayVN(d.getDay())} ${formatDateVN(d)}</span><br>`+
@@ -249,18 +249,115 @@ function normalizeFullStationNames(s){
   return s;
 }
 
+function normalizeContextualBlStationSlots(s){
+  // `bl` is Bạc Liêu only in an unambiguous station-header slot; after a
+  // number group it retains the established BAO LÔ selector meaning.
+  return String(s||"").split("\n").map(line=>{
+    const parts=line.split(/(\s+|[.:|+])/u), prior=[];
+    for(let i=0;i<parts.length;i++){
+      const token=parts[i]; if(!token || /^(?:\s+|[.:|+])$/u.test(token)) continue;
+      const lower=token.toLowerCase();
+      let next=""; for(let j=i+1;j<parts.length;j++) if(parts[j]&&!/^(?:\s+|[.:|+])$/u.test(parts[j])){next=parts[j];break;}
+      const stationHeader=prior.every(x=>ALL_STATION_CODES.has(x)||["mn","mt","mb","2d","3d","4d"].includes(x));
+      if(lower==="bl" && stationHeader && /^\d{1,4}$/u.test(next)) parts[i]="bli";
+      prior.push(String(parts[i]).toLowerCase());
+    }
+    return parts.join("");
+  }).join("\n");
+}
+
+function normalizeDuplicateAmountSuffix(s){
+  const selector="(?:dathang|dat|bao|bl|lo|lô|duoi|đuôi|dau|đầu|dx|đx|da|đá|dd|đđ|xc|b|d|x)";
+  return String(s||"").replace(new RegExp(`\\b(${selector}\\s*)(\\d+(?:[.,]\\d+)?)nn\\b`,"giu"),"$1$2n");
+}
+
+function normalizeNumericBetSeparators(s){
+  // A dot is a separator only inside a numeric betting run, never a blanket
+  // punctuation replacement. In particular, retain decimal money after a bet
+  // such as `b 10.50` / `xc 10.50n` and non-betting text such as dates.
+  const tokens=s.split(/(\s+)/u);
+  const hasBetSyntax=tokens.some(token=>token && !/^\s+$/u.test(token) && (isBetType(token)||splitCompactBetToken(token)));
+  if(!hasBetSyntax) return s;
+  const protectedMoney=[];
+  for(let i=0;i<tokens.length;i++){
+    if(!tokens[i] || /^\s+$/u.test(tokens[i]) || !isBetType(tokens[i])) continue;
+    let j=i+1; while(j<tokens.length && /^\s+$/u.test(tokens[j])) j++;
+    if(j<tokens.length && isMoneyToken(tokens[j])){
+      protectedMoney.push(tokens[j]);
+      tokens[j]=`\uE000${protectedMoney.length-1}\uE001`;
+    }
+  }
+  s=tokens.join("");
+  let previous;
+  do{
+    previous=s;
+    // Repeat to consume chained forms: 868...879..299 -> 868 879 299.
+    s=s.replace(/(^|[^\d])(\d{2,4})\s*\.+\s*(\d{2,4})(?![\dA-Za-zĐđ])/gu,"$1$2 $3");
+  }while(s!==previous);
+  return s.replace(/\uE000(\d+)\uE001/gu,(_,index)=>protectedMoney[Number(index)]);
+}
+
+function normalizeBetGrammarSeparators(s){
+  // Real Telegram input often joins betting atoms with dots/underscores or a
+  // pipe. This stays scoped to recognized betting grammar and preserves
+  // selector-bound decimal money and unrelated chat punctuation.
+  const hasBetSyntax=/(?:^|[\s._,|])(?:[234]d|b|bao|dd|đđ|xc|x|dx|đx|da|đá|dat|dathang|d|duoi|đuôi|dau|đầu|lo|lô|bl)(?=\s|\d|[._,|]|$)/iu.test(s);
+  if(!hasBetSyntax) return s;
+  const protectedDecimals=[];
+  const hold=value=>`\uE100${protectedDecimals.push(value)-1}\uE101`;
+  const selector="(?:dathang|bao|dat|dd|đđ|xc|dx|đx|da|đá|duoi|đuôi|dau|đầu|lo|lô|bl|b|x|d)";
+  s=s.replace(new RegExp(`(${selector})\\s*_+\\s*(\\d+(?:[.,]\\d+)?)\\s*_+\\s*([nd])\\b`,"giu"),"$1 $2 $3");
+  s=s.replace(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*_+\\s*([nd])(?=\\s*_+\\s*${selector}(?:\\s|\\d|[._,|]|$))`,"giu"),"$1 $2");
+  s=s.replace(new RegExp(`([nd])\\s*_+\\s*(?=${selector}(?:\\s|\\d|[._,|]|$))`,"giu"),"$1 ");
+  // Telegram sometimes separates the unit from a decimal amount.  This is
+  // still one money atom, not the numbers 2 and 5 plus a stray `n`.
+  s=s.replace(new RegExp(`\\b(${selector}\\s+\\d+[.,]\\d+)\\s+(n)\\b`,"giu"),"$1$2");
+  // Split an attached selector+amount before the next selector.  Generic
+  // atom splitting cannot reliably see through a later protected decimal.
+  s=s.replace(new RegExp(`\\b(${selector}\\d+(?:[.,]\\d+)?[a-zđ]?)\\s*[._,]+\\s*(?=${selector}(?:\\s|\\d|[._,|]|$))`,"giu"),"$1 ");
+  s=s.replace(new RegExp(`\\b${selector}\\d+[.,]\\d+[a-zđ]?\\b`,"giu"),hold);
+  s=s.replace(new RegExp(`\\b${selector}\\s+\\d+[.,]\\d+[a-zđ]?\\b`,"giu"),hold);
+  s=s.replace(/\s*\|+\s*/gu,"\uE102");
+  s=s.replace(/(\d{1,4})(?=(?:dau|đầu|duoi|đuôi)\d)/giu,"$1 ");
+  s=s.replace(/([234]d)\s*[._,]+\s*(\d{1,4})(?![\dA-Za-zĐđ])/giu,"$1 $2");
+  const atom=token=>{
+    const t=token.toLowerCase();
+    return ALL_STATION_CODES.has(t)||isNumberToken(t)||["2d","3d","4d"].includes(t)||
+    isBetType(t)||isMoneyToken(t)||!!splitCompactBetToken(t)||/^\uE100\d+\uE101$/u.test(t);
+  };
+  let previous;
+  do{
+    previous=s;
+    s=s.replace(/([^\s._,|]+)\s*[._,]+\s*([^\s._,|]+)/gu,(whole,left,right)=>
+      atom(left)&&atom(right)?`${left} ${right}`:whole);
+  }while(s!==previous);
+  s=s.replace(/([^\s._,|])[.,]+(?=\s|\uE102|$)/gu,"$1 ");
+  return s.replace(/\uE100(\d+)\uE101/gu,(_,index)=>protectedDecimals[Number(index)]).replace(/\uE102/gu,"\n");
+}
+
 function normalizeInput(s){
   s=stripInvisible(s).toLowerCase().trim();
   // '+' giữa các đài chỉ là dấu phân cách.
   s=s.replace(/\s*\+\s*/gu," ");
   // Tên đài viết nguyên, có dấu hoặc không dấu -> mã chuẩn.
   s=normalizeFullStationNames(s);
+  s=normalizeContextualBlStationSlots(s);
+  s=s.replace(/(^|\n)bli\s*:\s*(?=\d)/gu,"$1bli ");
+  // Keep the shared lexical selector alias aligned with Tách 3 Miền.
+  s=s.replace(/(^|\s)duôi(?=\s|\d|$)/giu,"$1duoi");
   s=s.replace(/(^|\s)dna(?=\s|$)/gu,"$1dn");
   s=s.replace(/(^|\s)hu(?=\s|$)/gu,"$1hue");
-  s=s.replace(/(^|\s)bl(?=\s|$)/gu,"$1bli");
+  // `bl` is the operator's BAO LÔ selector. Bạc Liêu keeps the explicit
+  // station code `bli` (or its full name), avoiding selector/station drift.
   s=s.replace(/(^|\s)dathang(?=\s|$)/gu,"$1dat");
+  s=normalizeNumericBetSeparators(s);
+  s=normalizeBetGrammarSeparators(s);
+  s=normalizeDuplicateAmountSuffix(s);
+  // A separated amount unit is valid only in selector context: `b 20 n`,
+  // `b20 n`, `dx 2,5 n`.  Do not globally join a number followed by a letter.
+  s=s.replace(/\b((?:dathang|dat|bao|bl|lo|lô|duoi|đuôi|dau|đầu|dx|đx|da|đá|dd|đđ|xc|b|d|x)\s*\d+(?:[.,]\d+)?)\s+([nd])\b/giu,"$1$2");
   s=s.replace(/(^|\s)\.+(?=\d)/gu,"$1");
-  return s.replace(/\s+/g," ").trim();
+  return s.replace(/[^\S\r\n]+/g," ").replace(/ *\n */g,"\n").trim();
 }
 function normalizeSenderName(s){
   return stripInvisible(s).trim().toLowerCase().replace(/\s+/g," ");
@@ -279,6 +376,8 @@ function parseChatEnvelope(line){
   m=line.match(CHAT_SENDER_TIME_RE);
   if(m && isSenderPrefix(m[1])) return {sender:m[1]||"",body:m[3]||"",metadata:false};
   m=line.match(CHAT_SENDER_PREFIX_RE);
+  // `BL:79 ...` is Bạc Liêu station punctuation, not a chat sender label.
+  if(m && /^bl$/iu.test(m[1]) && /^\s*\d{1,4}\b/u.test(m[2]||"")) return null;
   if(m && isSenderPrefix(m[1])) return {sender:m[1]||"",body:m[2]||"",metadata:false};
   if(CHAT_METADATA_ONLY_RE.test(line)) return {sender:null,body:"",metadata:true};
   return null;
@@ -288,7 +387,7 @@ function looksLikeChatLog(text){
 }
 function preprocessChatText(text){
   const lines=(text||"").split(/\r?\n/);
-  if(!looksLikeChatLog(text)) return text.trim();
+  if(!looksLikeChatLog(text)) return lines.map(line=>normalizeInput(line)).filter(Boolean).join("\n");
   const kept=[];
   let insideMessage=false;
   let currentKeep=true;
@@ -334,22 +433,53 @@ function splitCompactBetToken(tok){
   return null;
 }
 
+function parseBetPayloadAst(rest){
+  const toks=String(rest||"").split(/\s+/).filter(Boolean),groups=[]; let i=0;
+  while(i<toks.length){
+    const numbers=[];
+    while(i<toks.length&&isNumberToken(toks[i])&&!isBetType(toks[i])) numbers.push(toks[i++]);
+    if(!numbers.length) throw new Error(`phải có số đánh trước '${toks[i]||""}'`);
+    const seen=new Set(),dups=[]; for(const n of numbers){if(seen.has(n)&&!dups.includes(n))dups.push(n);seen.add(n);}
+    if(dups.length) throw new Error(dups.length===1?`trùng số ${dups[0]} trong cùng cú pháp`:`trùng các số ${dups.join(", ")} trong cùng cú pháp`);
+    const bets=[];
+    while(i<toks.length){
+      if(isNumberToken(toks[i])&&!isBetType(toks[i])) break;
+      const compact=splitCompactBetToken(toks[i]); let selector,money;
+      if(compact){[selector,money]=compact;i++;}
+      else if(isBetType(toks[i])){selector=toks[i++];money=toks[i++];if(!money)throw new Error(`thiếu tiền sau loại cược '${selector}'`);}
+      else if(isMoneyToken(toks[i])) throw new Error(`thiếu loại cược trước '${toks[i]}'`);
+      else throw new Error(`không nhận ra cú pháp '${toks[i]}'`);
+      if(isBetType(money)||splitCompactBetToken(money)||!isMoneyToken(money)) throw new Error(`tiền cược '${money}' không hợp lệ`);
+      bets.push({selector,amount:money});
+    }
+    if(!bets.length) throw new Error("thiếu loại cược sau số"); groups.push({numbers,bets});
+  } return groups;
+}
+
 function validateBetPayload(rest){
+  parseBetPayloadAst(rest); return true;
   const toks=rest.split(/\s+/).filter(Boolean);
   if(!toks.length) throw new Error("thiếu nội dung cược");
   let i=0;
-  const allNumbers=[];
-
   while(i<toks.length){
     const nums=[];
     while(i<toks.length && isNumberToken(toks[i]) && !isBetType(toks[i])){
-      nums.push(toks[i]); allNumbers.push(toks[i]); i++;
+      nums.push(toks[i]); i++;
     }
     if(!nums.length){
       const tok=toks[i]||"";
       if(isMoneyToken(tok)) throw new Error(`thiếu loại cược trước '${tok}'`);
       throw new Error(tok?`phải có số đánh trước '${tok}'`:"phải có số đánh");
     }
+    // A number list belongs to one logical betting clause. The selector and
+    // amount which follow close it; only duplicates inside this list fail.
+    const seen=new Set(),dups=[];
+    for(const n of nums){
+      if(seen.has(n)&&!dups.includes(n)) dups.push(n);
+      seen.add(n);
+    }
+    if(dups.length===1) throw new Error(`trùng số ${dups[0]} trong cùng cú pháp`);
+    if(dups.length>1) throw new Error(`trùng các số ${dups.join(", ")} trong cùng cú pháp`);
     if(i>=toks.length) throw new Error("thiếu loại cược sau số");
 
     let tok=toks[i];
@@ -380,13 +510,6 @@ function validateBetPayload(rest){
     if(!betCount) throw new Error("thiếu loại cược sau số");
   }
 
-  const seen=new Set(),dups=[];
-  for(const n of allNumbers){
-    if(seen.has(n)&&!dups.includes(n)) dups.push(n);
-    seen.add(n);
-  }
-  if(dups.length===1) throw new Error(`trùng số ${dups[0]} trong cùng cú pháp`);
-  if(dups.length>1) throw new Error(`trùng các số ${dups.join(", ")} trong cùng cú pháp`);
   return true;
 }
 
@@ -597,34 +720,39 @@ function formatAmount(value,suffix="",comma=false){
   return out+suffix;
 }
 
-function splitAmountFloorCeil(tok){
-  const p=parseMoneyToken(tok);
-  if(!p) return [tok,tok];
-
-  if(Number.isInteger(p.value)){
-    const left=Math.floor(p.value/2);
-    const right=p.value-left;
-    return [
-      formatAmount(left,p.suffix,p.comma),
-      formatAmount(right,p.suffix,p.comma)
-    ];
+function moneyHalfUnits(tok){
+  const m=String(tok||"").match(/^(\d+)(?:[.,](\d+))?([a-zA-ZđĐ]?)$/u);
+  if(!m) throw new Error("SỐ TIỀN CHIA CHỈ ĐƯỢC PHÉP BƯỚC 0.5");
+  const whole=Number(m[1]), fraction=m[2]||"";
+  if(!Number.isSafeInteger(whole) || (!/^0*$/u.test(fraction) && !/^50*$/u.test(fraction))){
+    throw new Error("SỐ TIỀN CHIA CHỈ ĐƯỢC PHÉP BƯỚC 0.5");
   }
-
-  const half=p.value/2;
-  return [
-    formatAmount(half,p.suffix,p.comma),
-    formatAmount(half,p.suffix,p.comma)
-  ];
+  return {halfUnits:whole*2+(fraction && !/^0*$/u.test(fraction)?1:0),suffix:m[3],comma:String(tok).includes(",")};
+}
+function formatHalfUnits(halfUnits,suffix="",comma=false){
+  const out=halfUnits%2===0?String(halfUnits/2):`${Math.floor(halfUnits/2)}.5`;
+  return (comma?out.replace(".",","):out)+suffix;
 }
 
-function splitHorizontalChunkTwo(chunk){
+function distributeAmountExactly(tok,count){
+  if(!Number.isInteger(count)||count<1) return Array(Math.max(0,count||0)).fill(null);
+  const p=moneyHalfUnits(tok);
+  const quotient=Math.floor(p.halfUnits/count), remainder=p.halfUnits%count;
+  return Array.from({length:count},(_,index)=>{
+    const units=quotient+(index>=count-remainder?1:0);
+    return units>0?formatHalfUnits(units,p.suffix,p.comma):null;
+  });
+}
+
+function splitHorizontalChunk(chunk,count=2){
   const toks=chunk.split(/\s+/).filter(Boolean);
-  const out1=[],out2=[];
-  let i=0,didSplit=false;
-  const daTypes=new Set(["da","đá","dat","dathang"]);
+  const out=Array.from({length:count},()=>[]);
+  const hasStake=Array(count).fill(false);
+  let i=0;
 
   while(i<toks.length && isNumberToken(toks[i]) && !isBetType(toks[i])){
-    out1.push(toks[i]); out2.push(toks[i]); i++;
+    for(const line of out) line.push(toks[i]);
+    i++;
   }
 
   while(i<toks.length){
@@ -633,40 +761,70 @@ function splitHorizontalChunkTwo(chunk){
 
     if(compact){
       const [bet,money]=compact;
-      const p=parseMoneyToken(money);
-
-      if(daTypes.has(bet) && p && p.value<5){
-        out1.push(tok); out2.push(tok);
-      }else{
-        const [m1,m2]=splitAmountFloorCeil(money);
-        out1.push(bet+m1); out2.push(bet+m2); didSplit=true;
-      }
+      const amounts=distributeAmountExactly(money,count);
+      amounts.forEach((amount,index)=>{
+        if(amount!==null){ out[index].push(bet+amount); hasStake[index]=true; }
+      });
       i++; continue;
     }
 
     if(isBetType(tok)){
       const bet=tok;
-      out1.push(bet); out2.push(bet);
-
-      if(i+1<toks.length){
-        const money=toks[i+1];
-        const p=parseMoneyToken(money);
-
-        if(daTypes.has(bet) && p && p.value<5){
-          out1.push(money); out2.push(money);
-        }else{
-          const [m1,m2]=splitAmountFloorCeil(money);
-          out1.push(m1); out2.push(m2); didSplit=true;
-        }
+      if(i+1<toks.length && isMoneyToken(toks[i+1])){
+        const amounts=distributeAmountExactly(toks[i+1],count);
+        amounts.forEach((amount,index)=>{
+          if(amount!==null){ out[index].push(bet,amount); hasStake[index]=true; }
+        });
         i+=2;
-      }else i++;
+      }else{
+        // Validation normally prevents this path; retain malformed input only
+        // once rather than silently duplicating a selector without its stake.
+        out[count-1].push(bet);
+        i++;
+      }
       continue;
     }
 
-    out1.push(tok); out2.push(tok); i++;
+    for(const line of out) line.push(tok);
+    i++;
   }
 
-  return [out1.join(" "),out2.join(" "),didSplit];
+  return out.map((line,index)=>hasStake[index]?line.join(" "):null);
+}
+
+function canonicalMoneySelector(value){
+  const aliases={b:"B",bao:"LO",dd:"DD","đđ":"DD",d:"D",dau:"DAU","đầu":"DAU",duoi:"DUOI","đuôi":"DUOI",lo:"LO","lô":"LO",bl:"LO",da:"DAT","đá":"DAT",dat:"DAT",dathang:"DAT",dx:"DX","đx":"DX",xc:"XC",x:"XC"};
+  return aliases[String(value||"").toLowerCase()]||null;
+}
+function moneyStakes(text){
+  const totals={},tokens=String(text||"").split(/\s+/).filter(Boolean); let i=0;
+  while(i<tokens.length){
+    const compact=tokens[i].match(/^(dathang|duoi|đuôi|dau|đầu|bao|dat|dx|đx|dd|đđ|xc|da|đá|lo|lô|bl|b|d|x)(\d+(?:[.,]\d+)?)([a-zA-ZđĐ]?)$/iu);
+    if(compact){const key=canonicalMoneySelector(compact[1]); totals[key]=(totals[key]||0)+Number(compact[2].replace(",","."));i++;continue;}
+    const key=canonicalMoneySelector(tokens[i]),money=key&&parseMoneyToken(tokens[i+1]||"");
+    if(key&&money){totals[key]=(totals[key]||0)+money.value;i+=2;continue;} i++;
+  } return totals;
+}
+function auditMoneyConservation(sourceText,outputs){
+  const input=moneyStakes(sourceText),output={};
+  // Explicit 3d/4d DX is a unit stake on every unordered station pair.
+  // Ordinary selectors remain total-to-distribute and are not multiplied.
+  String(sourceText||"").split(/\r?\n/).forEach(line=>{
+    const mode=String(line).match(/\b([34])d\b/i),tokens=String(line).split(/\s+/).filter(Boolean);
+    let dx;
+    for(let i=0;i<tokens.length;i++){
+      const compact=tokens[i].match(/^(?:dx|đx)(\d+(?:[.,]\d+)?)(?:n|d)?$/iu);
+      if(compact){dx=(dx||0)+Number(compact[1].replace(",","."));continue;}
+      if(/^(?:dx|đx)$/iu.test(tokens[i])){const money=parseMoneyToken(tokens[i+1]||"");if(money){dx=(dx||0)+money.value;i++;}}
+    }
+    if(mode&&dx!==undefined){const n=Number(mode[1]),pairs=n*(n-1)/2;input.DX=(input.DX||0)+dx*(pairs-1);}
+  });
+  (outputs||[]).forEach(line=>Object.entries(moneyStakes(line)).forEach(([key,value])=>output[key]=(output[key]||0)+value));
+  const rows=Array.from(new Set([...Object.keys(input),...Object.keys(output)])).sort().map(selector=>{
+    const original=input[selector]||0,parsed=output[selector]||0,delta=parsed-original;
+    return {selector,input_stake:String(original),output_stake:String(parsed),delta_signed:String(delta),result:delta===0?"KHỚP":delta>0?"DƯ":"THIẾU",ok:delta===0};
+  });
+  return {status:rows.every(row=>row.ok)?"PASS":"FAIL",rows};
 }
 
 function expandChunk(selector,chunk,region,stations){
@@ -675,31 +833,31 @@ function expandChunk(selector,chunk,region,stations){
   if(mode==="xc") return [`${selector} ${chunk}`];
 
   if(mode==="horizontal"){
-    const [c1,c2,didSplit]=splitHorizontalChunkTwo(chunk);
-    if(!didSplit) return [`${selector} ${chunk}`];
-    return [`${selector} ${c1}`,`${selector} ${c2}`];
+    return splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${selector} ${c}`);
   }
 
   // DX/ĐX old station split
   if(!stations.length) return [`${selector} ${chunk}`];
-  if(selector==="2d") return [`2d ${chunk}`];
+  if(selector==="2d"){
+    const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
+    if(explicitDx && stations.length>=2) return [`${stations[0][0]} ${stations[1][0]} ${chunk}`];
+    return [`2d ${chunk}`];
+  }
   if(stations.length<3) return [`${selector} ${chunk}`];
 
   const n=selector==="3d"?3:4;
   const selected=stations.slice(0,Math.min(n,stations.length));
-  const main=selected.slice(0,2);
-  const aux=selected.slice(2);
-
-  const out=[`2d ${chunk}`];
-  for(const a of aux){
-    for(const m of main){
-      out.push(`${m[0]} ${a[0]} ${chunk}`);
-    }
+  const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
+  if(explicitDx){
+    // Materialise each unordered pair from the authoritative schedule order.
+    // A role shorthand (`2d`) cannot prove the primary pair identity, and a
+    // reversed spelling must never be accepted as a second topology edge.
+    const pairs=[];
+    for(let i=0;i<selected.length;i++) for(let j=i+1;j<selected.length;j++) pairs.push(`${selected[i][0]} ${selected[j][0]}`);
+    return pairs.map(pair=>`${pair} ${chunk}`);
   }
-  if(selector==="4d" && aux.length>=2){
-    out.push(`${aux[0][0]} ${aux[1][0]} ${chunk}`);
-  }
-  return out;
+  const prefixes=["2d",...selected.slice(2).map(x=>x[0])];
+  return splitHorizontalChunk(chunk,prefixes.length).filter(Boolean).map((part,index)=>`${prefixes[index]} ${part}`);
 }
 
 function processLine(line,region,stations){
@@ -725,9 +883,7 @@ function processLine(line,region,stations){
           if(mode==="xc"){
             out.push(`${station} ${chunk}`);
           }else if(mode==="horizontal"){
-            const [c1,c2,didSplit]=splitHorizontalChunkTwo(chunk);
-            if(didSplit) out.push(`${station} ${c1}`,`${station} ${c2}`);
-            else out.push(`${station} ${chunk}`);
+            out.push(...splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${station} ${c}`));
           }else{
             out.push(`${station} ${chunk}`);
           }
@@ -1008,6 +1164,17 @@ async function cutSelectedOutput(){
   }
 }
 
+function resolveExplicitSourceRegion(text){
+  const lines=String(text||"").split(/\r?\n/).filter(x=>x.trim());
+  const first=(lines[0]||"").trim();
+  const m=first.match(/^[\s\-—|_.,]*(mn|mt|mb)(?=$|[\s\-—|_.,])/i);
+  if(!m) return {region:null,text};
+  const region=m[1].toLowerCase();
+  if(/^[\s\-—|_.,]*(mn|mt|mb)[\s\-—|_.,]*$/i.test(first)) lines.shift();
+  else lines[0]=lines[0].replace(/^[\s\-—|_.,]*(?:mn|mt|mb)[\s\-—|_.,]+/i,"").trim();
+  return {region,text:lines.join("\n")};
+}
+
 function run(){
   const raw=inputEl.value.trim();
   if(!raw){outputEl.value="";resetOutputRecords();setStatus("Chưa có tin.","err");return;}
@@ -1020,10 +1187,12 @@ function run(){
   }
   if(!clean){outputEl.value="";resetOutputRecords();setStatus("Không còn tin sau khi lọc chat.","err");return;}
 
-  const region=regionEl.value;
+  const explicit=resolveExplicitSourceRegion(clean);
+  const region=explicit.region||regionEl.value;
+  const source=explicit.text;
   const d=parseLocalDate(dateEl.value||localDateISO());
   const stations=getSchedule(region,d);
-  const errors=validateBatch(clean,region,stations);
+  const errors=validateBatch(source,region,stations);
 
   if(errors.length){
     resetOutputRecords();
@@ -1033,19 +1202,7 @@ function run(){
     return;
   }
 
-  const lines=clean.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  if(region==="mb"){
-    lastSourceLines=lines.slice();
-    outputRecords=lines.map((line,idx)=>({
-      sourceLine:idx+1,
-      text:normalizeInput(line),
-      alive:true
-    }));
-    renderOutputRecords();
-    setStatus(`MB OK • ${lines.length} tin • không tách đài${wasChat?" • đã lọc chat":""}`,"ok");
-    return;
-  }
-
+  const lines=source.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   lastSourceLines=lines.slice();
   outputRecords=[];
   lines.forEach((line,idx)=>{
@@ -1129,7 +1286,7 @@ loadSettings();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.4";
+const APP_VERSION = "1.0.5";
 let swRegistration = null;
 
 async function checkForAppUpdate() {

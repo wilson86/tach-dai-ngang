@@ -37,7 +37,7 @@ function loadRules() {
     }
   };
   vm.createContext(context);
-  vm.runInContext(`${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
+  vm.runInContext(`${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
   return context.__rules;
 }
 
@@ -48,8 +48,42 @@ function expectThrow(fn, expected) {
   assert.match(error.message, expected);
 }
 
+function totalStake(lines) {
+  let total = 0;
+  for (const line of lines) {
+    const tokens = line.split(/\s+/).filter(Boolean);
+    for (let i = 0; i < tokens.length; i++) {
+      const compact = tokens[i].match(/^(?:b|bao|dd|d|dau|duoi|da|đá|dat|dathang|dx|đx|xc|x)(\d+(?:[.,]\d+)?)n?$/iu);
+      if (compact) { total += Number(compact[1]); continue; }
+      if (/^(?:b|bao|dd|d|dau|duoi|da|đá|dat|dathang|dx|đx|xc|x)$/iu.test(tokens[i]) && /^\d+(?:[.,]\d+)?n?$/iu.test(tokens[i + 1] || "")) {
+        total += Number((tokens[++i]).replace(/n$/iu, "").replace(",","."));
+      }
+    }
+  }
+  return total;
+}
+
+function assertHalfUnitSplit(rules, amount, count) {
+  const parts = rules.distributeAmountExactly(`${amount}n`, count).filter(Boolean);
+  const units = parts.map(part => {
+    const m = part.match(/^(\d+)(?:[.,](\d+))?n$/u); assert.ok(m, `bad split token ${part}`);
+    assert.ok(!m[2] || /^0*$/u.test(m[2]) || /^50*$/u.test(m[2]), `quarter/other fraction ${part}`);
+    return Number(m[1]) * 2 + (m[2] && !/^0*$/u.test(m[2]) ? 1 : 0);
+  });
+  const sourceUnits = Number(String(amount).replace(".5", "")) * 2 + (String(amount).endsWith(".5") ? 1 : 0);
+  assert.equal(units.reduce((a,b)=>a+b,0), sourceUnits, `${amount}/${count} must conserve`);
+}
+
 async function main() {
   const rules = loadRules();
+  for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61]) {
+    for (const count of [2,3,4]) assertHalfUnitSplit(rules,amount,count);
+  }
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",2)),["3.5n","3.5n"]);
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("5.5n",2)),["2.5n","3n"]);
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("2.5n",2)),["1n","1.5n"]);
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",3)),["2n","2.5n","2.5n"]);
+  expectThrow(()=>rules.distributeAmountExactly("5.25n",2),/SỐ TIỀN CHIA CHỈ ĐƯỢC PHÉP BƯỚC 0\.5/u);
   const saturday = new Date("2026-08-22T12:00:00");
   const sunday = new Date("2026-08-23T12:00:00");
   const monday = new Date("2026-08-24T12:00:00");
@@ -59,7 +93,7 @@ async function main() {
   // ĐX/ĐA vẫn tách đài như tool cũ.
   assert.deepEqual(
     Array.from(rules.processLine("3d 22 10 dx 5n", "mt", mtSaturday)),
-    ["2d 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
+    ["dn qn 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
   );
 
   // Cược thường: đúng hai dòng, giữ selector, mỗi dòng nửa số lượng.
@@ -77,7 +111,7 @@ async function main() {
   );
   assert.deepEqual(
     Array.from(rules.processLine("3d 38 b5n", "mt", mtSaturday)),
-    ["3d 38 b2n", "3d 38 b3n"]
+    ["3d 38 b2.5n", "3d 38 b2.5n"]
   );
 
   // XC/X không tách đài và không chia số lượng.
@@ -97,12 +131,43 @@ async function main() {
   );
 
   // Alias/đài full, DAT và chat filter vẫn giữ nguyên.
-  assert.equal(rules.normalizeInput("Bến Tre Bạc Liêu Đà Nẵng Đắk Nông Quảng Ngãi bl"), "bt bli dn dno qn bli");
+  assert.equal(rules.normalizeInput("Bến Tre Bạc Liêu Đà Nẵng Đắk Nông Quảng Ngãi bl"), "bt bli dn dno qn bl");
+  assert.equal(rules.normalizeInput("Bạc Liêu"), "bli");
   assert.equal(rules.normalizeInput("ben tre bac lieu da nang dak nong quang ngai"), "bt bli dn dno qn");
   assert.doesNotThrow(() => rules.validateCheckOnlyLine("hue 71 dathang 2n", "mt", rules.getSchedule("mt", sunday)));
+
+  // P1: dots separating numeric betting tokens must be normalized before the
+  // canonical parser; decimal money after a bet remains intact.
+  const periodNumberCases = [
+    "2d 868.879.299 xc 10n",
+    "2d 868. 879. 299 xc 10n",
+    "2d 868 .879 .299 xc 10n",
+    "2d 868 . 879 . 299 xc 10n",
+    "2d 868...879..299 xc 10n",
+    "2d 868. 879 .299.252.729 .384 xc 10n"
+  ];
+  for(const value of periodNumberCases){
+    const normalized=rules.normalizeInput(value);
+    assert.match(normalized, /^2d 868 879 299(?: 252 729 384)? xc 10n$/);
+    assert.doesNotThrow(() => rules.validateCheckOnlyLine(normalized, "mn", mnMonday));
+  }
+  assert.equal(rules.normalizeInput("2d 12 b 10.50n"), "2d 12 b 10.50n");
+
+  // R25: BL is BAO LÔ/LO, never the Bạc Liêu station shorthand.
+  for(const selector of ["bl","BL","lo","lô"]){
+    const line=`3d 50 ${selector} 200`, normalized=rules.normalizeInput(line);
+    assert.doesNotThrow(()=>rules.validateCheckOnlyLine(normalized,"mn",mnMonday));
+    assert.ok(Array.from(rules.processLine(normalized,"mn",mnMonday)).length>0);
+  }
+  for(const line of ["3d 50.34.43 dx 10","3d 50. 34. 43 dx 10","3d 50 .34 .43 dx 10","3d 50 . 34 . 43 dx 10","3d 50...34..43 dx 10"]){
+    const normalized=rules.normalizeInput(line);
+    assert.equal(normalized,"3d 50 34 43 dx 10");
+    assert.doesNotThrow(()=>rules.validateCheckOnlyLine(normalized,"mn",mnMonday));
+  }
+
   assert.deepEqual(
     Array.from(rules.processLine("tp 31 91 b10n da 5n", "mn", mnMonday)),
-    ["tp 31 91 b5n dat 2n", "tp 31 91 b5n dat 3n"]
+    ["tp 31 91 b5n dat 2.5n", "tp 31 91 b5n dat 2.5n"]
   );
   expectThrow(() => rules.validateCheckOnlyLine("tp 31 91 dx 5n", "mn", mnMonday), /1 đài 'tp' phải dùng 'dat'/);
   const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n
@@ -137,21 +202,42 @@ assert.deepEqual(
 );
 assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 b5n", "mt", mtSaturday)),
-  ["2d 17 b2n", "2d 17 b3n"]
+  ["2d 17 b2.5n", "2d 17 b2.5n"]
 );
 assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday)),
   ["dn qn 17 dx2n"]
 );
 
-// DA/DAT Ngang: >=5 chia; <5 giữ.
+// DA/DAT Ngang: always split and conserve the original selector stake.
 assert.deepEqual(
   Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
-  ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
+  ["tp 31 91 dat 3.5n", "tp 31 91 dat 3.5n"]
+);
+  assert.deepEqual(
+    Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
+    ["tp 31 91 dat 2n", "tp 31 91 dat 2n"]
 );
 assert.deepEqual(
-  Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
-  ["tp 31 91 dat 4n"]
+  Array.from(rules.processLine("tp 12 52 79 dd 60n da 2n", "mn", mnMonday)),
+  ["tp 12 52 79 dd 30n dat 1n", "tp 12 52 79 dd 30n dat 1n"]
+);
+
+// P0 money conservation: quotient/remainder is in half-units. No generated
+// line may create quarters or lose/invent a stake.
+for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61]) {
+  for (const selector of ["b", "dd", "da", "dat", "dathang", "dx"]) {
+    const source = selector === "da" || selector === "dat" || selector === "dathang"
+      ? `tp 12 52 79 ${selector} ${amount}n`
+      : `2d 12 52 79 ${selector} ${amount}n`;
+    const output = Array.from(rules.processLine(source, "mn", mnMonday));
+    assert.equal(totalStake(output), amount, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
+    assert.ok(!/\.(?:25|75)/u.test(output.join(" ")), `must not create quarter unit: ${source}`);
+  }
+}
+assert.deepEqual(
+  Array.from(rules.processLine("tp 12 52 dd 2n dat 1n", "mn", mnMonday)),
+  ["tp 12 52 dd 1n dat 0.5n", "tp 12 52 dd 1n dat 0.5n"]
 );
 
 // MB chỉ kiểm tra, không tách/cắt ngang.
