@@ -1,6 +1,6 @@
 {
-  "version": "1.0.5",
-  "updated": "2026-08-29",
+  "version": "1.0.7",
+  "updated": "2026-09-14",
   "app": "tach-dai-ngang",
-  "notes": "Shared rules sync with Tach 3 Mien; Vinh drop whole block. Ngang engine unchanged: DX old split, XC keep, integer floor/ceil, DA>=5 split."
+  "notes": "Calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit."
 }

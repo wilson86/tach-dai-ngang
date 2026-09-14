@@ -68,7 +68,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.5</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.7</span></div>
 
   <div class="card">
     <div class="controls">
@@ -113,32 +113,14 @@
   </div>
 </div>
 
+<script src="./station_calendar.generated.js"></script>
 <script>
 "use strict";
 
-// =========================
-// LỊCH ĐÀI TĨNH - OFFLINE
-// JS Date: 0=CN, 1=T2, ... 6=T7
-// =========================
-const MN = {
-  1:[["tp","TP.HCM"],["dt","Đồng Tháp"],["cm","Cà Mau"]],
-  2:[["bt","Bến Tre"],["vt","Vũng Tàu"],["bli","Bạc Liêu"]],
-  3:[["dn","Đồng Nai"],["ct","Cần Thơ"],["st","Sóc Trăng"]],
-  4:[["tn","Tây Ninh"],["ag","An Giang"],["bt","Bình Thuận"]],
-  5:[["vl","Vĩnh Long"],["bd","Bình Dương"],["tv","Trà Vinh"]],
-  6:[["tp","TP.HCM"],["la","Long An"],["bp","Bình Phước"],["hg","Hậu Giang"]],
-  0:[["tg","Tiền Giang"],["kg","Kiên Giang"],["dl","Đà Lạt"]]
-};
-
-const MT = {
-  1:[["hue","Huế"],["py","Phú Yên"]],
-  2:[["dl","Đắk Lắk"],["qn","Quảng Nam"]],
-  3:[["dn","Đà Nẵng"],["kh","Khánh Hòa"]],
-  4:[["bd","Bình Định"],["qt","Quảng Trị"],["qb","Quảng Bình"]],
-  5:[["gl","Gia Lai"],["nt","Ninh Thuận"]],
-  6:[["dn","Đà Nẵng"],["qn","Quảng Ngãi"],["dno","Đắk Nông"]],
-  0:[["kh","Khánh Hòa"],["kt","Kon Tum"],["hue","Huế"]]
-};
+// Calendar data is generated from the Router's sole authority.  UI code may
+// render it but must never own an independently maintained weekday table.
+if(!globalThis.KTS_STATION_CALENDAR) throw new Error("CALENDAR_AUTHORITY_MISSING");
+const {MN,MT}=globalThis.KTS_STATION_CALENDAR;
 
 const REGION_LABEL={mn:"Miền Nam",mt:"Miền Trung",mb:"Miền Bắc"};
 const BET_TYPES=new Set([
@@ -737,6 +719,19 @@ function formatHalfUnits(halfUnits,suffix="",comma=false){
 function distributeAmountExactly(tok,count){
   if(!Number.isInteger(count)||count<1) return Array(Math.max(0,count||0)).fill(null);
   const p=moneyHalfUnits(tok);
+  // Tách Đài Ngang owns an intentional horizontal allocation.  A whole
+  // source stake is therefore allocated in whole units with deterministic
+  // quotient/remainder; it must never invent .5 merely because the number of
+  // branches is even.  Fractional source money remains on the pre-qualified
+  // half-unit path below (for example 2.5n -> 1n + 1.5n).
+  const whole=String(tok||"").match(/^(\d+)(?:[.,]0+)?([a-zA-ZđĐ]?)$/u);
+  if(whole){
+    const total=Number(whole[1]), quotient=Math.floor(total/count), remainder=total%count;
+    return Array.from({length:count},(_,index)=>{
+      const units=quotient+(index>=count-remainder?1:0);
+      return units>0?`${units}${whole[2]}`:null;
+    });
+  }
   const quotient=Math.floor(p.halfUnits/count), remainder=p.halfUnits%count;
   return Array.from({length:count},(_,index)=>{
     const units=quotient+(index>=count-remainder?1:0);
@@ -1286,7 +1281,7 @@ loadSettings();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.7";
 let swRegistration = null;
 
 async function checkForAppUpdate() {
