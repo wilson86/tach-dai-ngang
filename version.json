@@ -1,6 +1,7 @@
 {
-  "version": "1.0.7",
+  "version": "1.0.14",
   "updated": "2026-09-14",
   "app": "tach-dai-ngang",
-  "notes": "Calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit."
+  "notes": "Calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit.",
+  "business_engine_sha256": "2aea573c27fba78f1c98c664a4dc009d071cc3677fc3ee7f1183104ea93f64b4"
 }
