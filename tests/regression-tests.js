@@ -7,6 +7,8 @@ const vm = require("node:vm");
 
 const root = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+const calendar = fs.readFileSync(path.join(root, "station_calendar.generated.js"), "utf8");
+const businessEngine = fs.readFileSync(path.join(root, "business_engine.generated.js"), "utf8");
 const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
 const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
@@ -37,7 +39,7 @@ function loadRules() {
     }
   };
   vm.createContext(context);
-  vm.runInContext(`${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
+  vm.runInContext(`${calendar}\n${businessEngine}\n${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),engine:KTS_BUSINESS_ENGINE,elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
   return context.__rules;
 }
 
@@ -79,10 +81,10 @@ async function main() {
   for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61]) {
     for (const count of [2,3,4]) assertHalfUnitSplit(rules,amount,count);
   }
-  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",2)),["3.5n","3.5n"]);
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",2)),["3n","4n"]);
   assert.deepEqual(Array.from(rules.distributeAmountExactly("5.5n",2)),["2.5n","3n"]);
   assert.deepEqual(Array.from(rules.distributeAmountExactly("2.5n",2)),["1n","1.5n"]);
-  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",3)),["2n","2.5n","2.5n"]);
+  assert.deepEqual(Array.from(rules.distributeAmountExactly("7n",3)),["2n","2n","3n"]);
   expectThrow(()=>rules.distributeAmountExactly("5.25n",2),/SỐ TIỀN CHIA CHỈ ĐƯỢC PHÉP BƯỚC 0\.5/u);
   const saturday = new Date("2026-08-22T12:00:00");
   const sunday = new Date("2026-08-23T12:00:00");
@@ -96,7 +98,8 @@ async function main() {
     ["dn qn 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
   );
 
-  // Cược thường: đúng hai dòng, giữ selector, mỗi dòng nửa số lượng.
+  // Cược thường: đúng hai dòng, giữ selector, whole stake uses deterministic
+  // integer quotient/remainder instead of inventing fractional stake.
   assert.deepEqual(
     Array.from(rules.processLine("3d 68 69 70 b 30 dd 60", "mt", mtSaturday)),
     ["3d 68 69 70 b 15 dd 30", "3d 68 69 70 b 15 dd 30"]
@@ -111,7 +114,7 @@ async function main() {
   );
   assert.deepEqual(
     Array.from(rules.processLine("3d 38 b5n", "mt", mtSaturday)),
-    ["3d 38 b2.5n", "3d 38 b2.5n"]
+    ["3d 38 b2n", "3d 38 b3n"]
   );
 
   // XC/X không tách đài và không chia số lượng.
@@ -167,7 +170,7 @@ async function main() {
 
   assert.deepEqual(
     Array.from(rules.processLine("tp 31 91 b10n da 5n", "mn", mnMonday)),
-    ["tp 31 91 b5n dat 2.5n", "tp 31 91 b5n dat 2.5n"]
+    ["tp 31 91 b5n dat 2n", "tp 31 91 b5n dat 3n"]
   );
   expectThrow(() => rules.validateCheckOnlyLine("tp 31 91 dx 5n", "mn", mnMonday), /1 đài 'tp' phải dùng 'dat'/);
   const chat = `[8/23/2026 5:31 PM] Hiền: 20 89 98 da 2n
@@ -202,7 +205,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 b5n", "mt", mtSaturday)),
-  ["2d 17 b2.5n", "2d 17 b2.5n"]
+  ["2d 17 b2n", "2d 17 b3n"]
 );
 assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday)),
@@ -212,7 +215,7 @@ assert.deepEqual(
 // DA/DAT Ngang: always split and conserve the original selector stake.
 assert.deepEqual(
   Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
-  ["tp 31 91 dat 3.5n", "tp 31 91 dat 3.5n"]
+  ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
 );
   assert.deepEqual(
     Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
@@ -237,7 +240,7 @@ for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61
 }
 assert.deepEqual(
   Array.from(rules.processLine("tp 12 52 dd 2n dat 1n", "mn", mnMonday)),
-  ["tp 12 52 dd 1n dat 0.5n", "tp 12 52 dd 1n dat 0.5n"]
+  ["tp 12 52 dd 1n", "tp 12 52 dd 1n dat 1n"]
 );
 
 // MB chỉ kiểm tra, không tách/cắt ngang.
