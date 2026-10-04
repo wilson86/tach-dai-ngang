@@ -266,7 +266,14 @@ assert.deepEqual(
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
 
-  // PWA/offline/auto update cho subpath GitHub Pages.
+  // Standalone controls must exist because Unified embeds this page cross-origin.
+assert.match(html, /id="selectAllInputBtn"/);
+assert.match(html, /id="selectAllOutputBtn"/);
+assert.match(html, /selectAllInputBtn[^\n]*addEventListener|\$\("selectAllInputBtn"\)\.addEventListener/);
+assert.match(html, /selectAllOutputBtn[^\n]*addEventListener|\$\("selectAllOutputBtn"\)\.addEventListener/);
+assert.match(html, /run\(\{preserveInputSelection:true\}\)/);
+
+// PWA/offline/auto update cho subpath GitHub Pages.
   const appVersion = html.match(/const APP_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "thiếu APP_VERSION");
   assert.equal(appVersion[1], version.version, "APP_VERSION và version.json lệch nhau");
