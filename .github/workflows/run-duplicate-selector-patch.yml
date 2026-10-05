@@ -64,9 +64,9 @@ jobs:
 
           sp = Path('sw.js')
           sw = sp.read_text(encoding='utf-8')
-          sw = sw.replace('tach-dai-ngang-v1.0.16', 'tach-dai-ngang-v1.0.17-duplicate-selector')
+          sw = sw.replace('tach-dai-ngang-v1.0.16', 'tach-dai-ngang-v1.0.17')
           sw = sw.replace('version:\"1.0.16\"', 'version:\"1.0.17\"')
-          if 'v1.0.17-duplicate-selector' not in sw:
+          if 'CACHE_NAME = "tach-dai-ngang-v1.0.17"' not in sw:
               raise SystemExit('service worker cache bump failed')
           sp.write_text(sw, encoding='utf-8')
 
