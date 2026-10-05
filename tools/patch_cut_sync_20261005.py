@@ -39,5 +39,5 @@ vp.write_text(json.dumps(v,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 sp=Path('sw.js')
 sw=sp.read_text(encoding='utf-8')
 assert 'tach-dai-ngang-v1.0.15' in sw
-sw=sw.replace('tach-dai-ngang-v1.0.15','tach-dai-ngang-v1.0.16-cut-sync').replace('version:"1.0.15"','version:"1.0.16"')
+sw=sw.replace('tach-dai-ngang-v1.0.15','tach-dai-ngang-v1.0.16').replace('version:"1.0.15"','version:"1.0.16"')
 sp.write_text(sw,encoding='utf-8')
