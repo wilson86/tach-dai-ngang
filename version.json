@@ -1,7 +1,7 @@
 {
-  "version": "1.0.15",
+  "version": "1.0.16",
   "updated": "2026-10-05",
   "app": "tach-dai-ngang",
-  "notes": "Standalone Tách Ngang adds explicit Select All controls for input/output and preserves active source selection during automatic sync; business engine unchanged.",
+  "notes": "Tách Ngang Cut writes clipboard before removing result/source and preserves Select All across button focus; business engine unchanged.",
   "business_engine_sha256": "6ce6fca5adbaaf7604e21ac91e0fcb7759201b53afd0d7d1d5ef2a9bf546837c"
 }
