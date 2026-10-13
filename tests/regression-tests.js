@@ -324,7 +324,9 @@ assert.match(html, /run\(\{preserveInputSelection:true\}\)/);
   const appVersion = html.match(/const APP_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "thiếu APP_VERSION");
   assert.equal(appVersion[1], version.version, "APP_VERSION và version.json lệch nhau");
-  assert.match(sw, new RegExp(`CACHE_NAME = "tach-dai-ngang-v${appVersion[1].replaceAll(".", "\\.")}"`));
+  // A semantic cache revision is permitted after the monotonic app version;
+  // reject a different base version but do not force a stale cache name.
+  assert.match(sw, new RegExp(`CACHE_NAME = "tach-dai-ngang-v${appVersion[1].replaceAll(".", "\\.")}(?:-[^"]+)?"`));
   assert.match(sw, new RegExp(`JSON\\.stringify\\(\\{version:"${appVersion[1].replaceAll(".", "\\.")}"\\}\\)`));
   assert.match(html, /serviceWorker\.register\("\.\/sw\.js", \{ scope: "\.\/" \}\)/);
   assert.match(html, /fetch\("\.\/version\.json\?t=" \+ Date\.now\(\), \{[\s\S]*?cache: "no-store"/);
