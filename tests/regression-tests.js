@@ -249,7 +249,7 @@ assert.deepEqual(
   assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
-  // Cut/Undo phải đồng bộ Input <-> Output khi một tin tạo hai dòng ngang.
+  // A partial derived horizontal row has no exact executable source; refuse it.
   const ui = rules.elements;
   ui.region.value = "mt"; ui.date.value = "2026-08-22"; ui.today.checked = false;
   ui.input.value = "3d 38 b10n\n3d 68 xc 20n";
@@ -258,13 +258,14 @@ assert.deepEqual(
   ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n".length;
   await rules.cutSelectedOutput();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
-  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
-  ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n".length;
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
+  // Selecting both derived rows is source-equivalent and can be cut.
+  ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n\n3d 38 b5n".length;
   await rules.cutSelectedOutput();
   assert.equal(ui.input.value, "3d 68 xc 20n");
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
-  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
 
     // PWA direct-UI regression: this path must never depend on Router bridge.
   ui.region.value = "mn";
