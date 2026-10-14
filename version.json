@@ -1,7 +1,7 @@
 {
-  "version": "1.0.23",
+  "version": "1.0.24",
   "updated": "2026-10-15",
   "app": "tach-dai-ngang",
-  "notes": "Arbitrary checked-row Cut uses a labelled local exact-output ledger when a surviving subset cannot be replayed as a valid customer source; Ngang allocation and immutable origin are preserved.",
+  "notes": "Arbitrary checked-row Cut persists a validated local exact-output ledger for any non-replayable remaining subset, preserving Ngang allocation and immutable origin through reload.",
   "business_engine_sha256": "046935677f9d88468b71246410444c27435c72e1415aeb359c799452584c36eb"
 }
