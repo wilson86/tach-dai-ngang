@@ -249,7 +249,7 @@ assert.deepEqual(
   assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
-  // A partial derived horizontal row has no exact executable source; refuse it.
+  // A partial derived horizontal row is retained in the exact-output ledger.
   const ui = rules.elements;
   ui.region.value = "mt"; ui.date.value = "2026-08-22"; ui.today.checked = false;
   ui.input.value = "3d 38 b10n\n3d 68 xc 20n";
@@ -257,6 +257,11 @@ assert.deepEqual(
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
   ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n".length;
   await rules.cutSelectedOutput();
+  assert.match(ui.input.value,/^\[\[KTS_EXACT_OUTPUT_LEDGER_V1\]\]/u);
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
+  rules.run();
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
+  rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
   // Selecting both derived rows is source-equivalent and can be cut.
