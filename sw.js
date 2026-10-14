@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.20-grouped-checkbox-results";
+const CACHE_NAME = "tach-dai-ngang-v1.0.21-semantic-result-checkbox-groups";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.20"}), {
+        new Response(JSON.stringify({version:"1.0.21"}), {
           headers: { "Content-Type": "application/json" }
         })
       )
