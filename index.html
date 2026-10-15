@@ -256,7 +256,7 @@ function updateUI(){
 
 function saveSettings(){
   try{
-    localStorage.setItem("tachDaiMobileSettings",JSON.stringify({
+    localStorage.setItem("tachDaiNgangSettings",JSON.stringify({
       region:regionEl.value,date:dateEl.value,today:todayEl.checked
     }));
   }catch(_){}
@@ -264,7 +264,7 @@ function saveSettings(){
 function loadSettings(){
   dateEl.value=localDateISO();
   try{
-    const s=JSON.parse(localStorage.getItem("tachDaiMobileSettings")||"{}");
+    const s=JSON.parse(localStorage.getItem("tachDaiNgangSettings")||"{}");
     if(["mn","mt","mb"].includes(s.region)) regionEl.value=s.region;
     if(typeof s.today==="boolean") todayEl.checked=s.today;
     if(s.date) dateEl.value=s.date;
