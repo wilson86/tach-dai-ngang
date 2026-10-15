@@ -32,7 +32,7 @@ const ctx={
 ctx.window=ctx;
 vm.createContext(ctx);
 vm.runInContext(cal+"\n"+engine+"\n"+source+
-  "\nglobalThis.__ledger={id:EXACT_OUTPUT_LEDGER_APP_ID,key:EXACT_OUTPUT_LEDGER_STORAGE_KEY,serialize:serializeExactOutputLedger,parse:parseExactOutputLedger,restore:restorePersistedExactOutputLedger,persist:persistExactOutputLedger,input:inputEl,region:regionEl,date:dateEl};",ctx);
+  "\nglobalThis.__ledger={id:EXACT_OUTPUT_LEDGER_APP_ID,key:EXACT_OUTPUT_LEDGER_STORAGE_KEY,serialize:serializeExactOutputLedger,parse:parseExactOutputLedger,restore:restorePersistedExactOutputLedger,persist:persistExactOutputLedger,saveSettings,input:inputEl,region:regionEl,date:dateEl};",ctx);
 const api=ctx.__ledger;
 assert.equal(api.id,"tach-dai-ngang");
 assert.equal(api.key,"tachDaiNgangExactOutputLedgerV1");
@@ -59,4 +59,12 @@ assert.equal(map.has("tachDaiMobileExactOutputLedgerV1"),true,"other app storage
 map.set("tachDaiNgangExactOutputLedgerV1",raw);
 api.restore();
 assert.equal(api.input.value,raw,"own tagged ledger can restore");
+map.set("tachDaiMobileSettings",JSON.stringify({region:"mb",date:"2026-10-01",today:false}));
+api.region.value="mn";api.date.value="2026-10-15";
+api.saveSettings();
+assert.equal(JSON.parse(map.get("tachDaiMobileSettings")).region,"mb",
+  "Ngang settings must not overwrite Mobile settings on same HTTPS origin");
+assert.equal(JSON.parse(map.get("tachDaiNgangSettings")).region,"mn",
+  "Ngang saves its own region/date key");
+
 console.log("LEDGER APP IDENTITY ISOLATION: PASS");
