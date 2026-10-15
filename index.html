@@ -161,7 +161,7 @@ let undoStack=[];
 let outputRecords=[]; // [{id,sourceLine,text,alive}]
 let lastOutputSelection={start:0,end:0};
 const EXACT_OUTPUT_LEDGER_PREFIX="[[KTS_EXACT_OUTPUT_LEDGER_V1]]\n";
-const EXACT_OUTPUT_LEDGER_STORAGE_KEY="KTS_EXACT_OUTPUT_LEDGER_V1";
+const EXACT_OUTPUT_LEDGER_STORAGE_KEY="tachDaiNgangExactOutputLedgerV1";
 let workingLedger=null;
 function cloneLedger(value){return value?JSON.parse(JSON.stringify(value)):null;}
 function engineSha(){return String(KTS_BUSINESS_ENGINE.ENGINE_SHA256||"");}
