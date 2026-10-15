@@ -249,7 +249,7 @@ assert.deepEqual(
   assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
-  // Cut/Undo phải đồng bộ Input <-> Output khi một tin tạo hai dòng ngang.
+  // A partial derived horizontal row is retained in the exact-output ledger.
   const ui = rules.elements;
   ui.region.value = "mt"; ui.date.value = "2026-08-22"; ui.today.checked = false;
   ui.input.value = "3d 38 b10n\n3d 68 xc 20n";
@@ -257,16 +257,69 @@ assert.deepEqual(
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
   ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n".length;
   await rules.cutSelectedOutput();
-  assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
+  assert.match(ui.input.value,/^\[\[KTS_EXACT_OUTPUT_LEDGER_V1\]\]/u);
   assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
-  ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n".length;
+  rules.run();
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
+  rules.triggerUndo();
+  assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
+  // Selecting both derived rows is source-equivalent and can be cut.
+  ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n\n3d 38 b5n".length;
   await rules.cutSelectedOutput();
   assert.equal(ui.input.value, "3d 68 xc 20n");
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
-  assert.equal(ui.output.value, "3d 38 b5n\n3d 68 xc 20n");
+  assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
 
-  // Standalone controls must exist because Unified embeds this page cross-origin.
+    // PWA direct-UI regression: this path must never depend on Router bridge.
+  ui.region.value = "mn";
+  ui.date.value = "2026-10-13";
+  ui.today.checked = false;
+  const separatorMessage = "2d. 52. 852. B10n.\n--//-----//--\n3d. 43. 83.b 10n";
+  ui.input.value = separatorMessage;
+  rules.run();
+  const separatorOutput = ui.output.value;
+  assert.ok(separatorOutput.length > 0 && !separatorOutput.includes("PHÁT HIỆN TIN SAI"));
+  assert.ok(!separatorOutput.includes("--//-----//--"));
+  assert.deepEqual(Array.from(new Set(rules.getOutputRecords().map(r => r.sourceLine))), [1, 3]);
+
+  // A separator is not an output row and cannot change money allocation.
+  ui.input.value = "2d. 52. 852. B10n.\n3d. 43. 83.b 10n";
+  rules.run();
+  assert.equal(ui.output.value, separatorOutput);
+
+  // Blank physical lines retain their original source spans even in Ngang.
+  ui.input.value = "2d 52 b10n\n\n--//-----//--\n3d 43 b10n";
+  rules.run();
+  assert.deepEqual(Array.from(new Set(rules.getOutputRecords().map(r => r.sourceLine))), [1, 4]);
+
+  // An all-separator input is HOLD/EMPTY, not successful empty output.
+  ui.input.value = "----\n////\n————";
+  rules.run();
+  assert.equal(ui.output.value, "");
+  assert.equal(rules.getOutputRecords().length, 0);
+
+  // Any mixed or unrecognized text is still an atomic parser error.
+  ui.input.value = "2d 52 b10n\n--//oops//--";
+  rules.run();
+  assert.match(ui.output.value, /PHÁT HIỆN TIN SAI/);
+  assert.match(ui.output.value, /Dòng 2:/);
+  assert.equal(rules.getOutputRecords().length, 0);
+
+  // CUT all preserves clipboard/undo contract and removes orphan separators.
+  ui.input.value = separatorMessage;
+  rules.run();
+  ui.output.selectionStart = 0;
+  ui.output.selectionEnd = ui.output.value.length;
+  await rules.cutSelectedOutput();
+  assert.equal(ui.input.value, "");
+  assert.equal(ui.output.value, "");
+  rules.triggerUndo();
+  assert.equal(ui.input.value, separatorMessage);
+  assert.equal(ui.output.value, separatorOutput);
+
+// Standalone controls must exist because Unified embeds this page cross-origin.
 assert.match(html, /id="selectAllInputBtn"/);
 assert.match(html, /id="selectAllOutputBtn"/);
 assert.match(html, /selectAllInputBtn[^\n]*addEventListener|\$\("selectAllInputBtn"\)\.addEventListener/);
@@ -277,7 +330,9 @@ assert.match(html, /run\(\{preserveInputSelection:true\}\)/);
   const appVersion = html.match(/const APP_VERSION = "([^"]+)"/);
   assert.ok(appVersion, "thiếu APP_VERSION");
   assert.equal(appVersion[1], version.version, "APP_VERSION và version.json lệch nhau");
-  assert.match(sw, new RegExp(`CACHE_NAME = "tach-dai-ngang-v${appVersion[1].replaceAll(".", "\\.")}"`));
+  // A semantic cache revision is permitted after the monotonic app version;
+  // reject a different base version but do not force a stale cache name.
+  assert.match(sw, new RegExp(`CACHE_NAME = "tach-dai-ngang-v${appVersion[1].replaceAll(".", "\\.")}(?:-[^"]+)?"`));
   assert.match(sw, new RegExp(`JSON\\.stringify\\(\\{version:"${appVersion[1].replaceAll(".", "\\.")}"\\}\\)`));
   assert.match(html, /serviceWorker\.register\("\.\/sw\.js", \{ scope: "\.\/" \}\)/);
   assert.match(html, /fetch\("\.\/version\.json\?t=" \+ Date\.now\(\), \{[\s\S]*?cache: "no-store"/);
