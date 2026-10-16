@@ -1,0 +1,22 @@
+"use strict";
+// Draft release candidate only: no browser/network, no publication.
+const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path");
+const root=path.resolve(__dirname,".."),read=p=>fs.readFileSync(path.join(root,p),"utf8");
+const html=read("index.html"),sw=read("sw.js");
+const version=JSON.parse(read("version.json")),manifest=JSON.parse(read("manifest.webmanifest"));
+const engine=read("business_engine.generated.js");
+const V="1.0.27", SHA="046935677f9d88468b71246410444c27435c72e1415aeb359c799452584c36eb";
+assert.equal(version.version,V);
+assert.equal(version.business_engine_sha256,SHA);
+assert.ok(engine.includes(SHA));
+assert.ok(html.includes('const APP_VERSION = "'+V+'"'));
+assert.ok(html.includes("v"+V));
+assert.ok(sw.includes("tach-dai-ngang-v"+V+"-chat-scroll-focus"));
+assert.ok(sw.includes('JSON.stringify({version:"'+V+'"})'));
+assert.equal(manifest.start_url,"./index.html");
+assert.equal(manifest.scope,"./");
+assert.ok(sw.includes('"./station_calendar.generated.js"'));
+assert.ok(sw.includes('"./business_engine.generated.js"'));
+assert.ok(sw.includes('cache.put("./index.html", copy)'));
+assert.ok(!html.includes("v1.0.26</span>"));
+console.log("RELEASE REVIEW ASSET CONSISTENCY — NGANG PASS");

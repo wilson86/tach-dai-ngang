@@ -1,7 +1,7 @@
 {
-  "version": "1.0.26",
-  "updated": "2026-10-15",
+  "version": "1.0.27",
+  "updated": "2026-10-16",
   "app": "tach-dai-ngang",
-  "notes": "Human-readable exact wager-row ledger with Copy/Cut, original audit and preserved Ngang money split; no engine/money change.",
+  "notes": "Telegram sender/timestamp preprocessor retained; checkbox selection keeps DOM/scroll/focus, Copy/Cut/Undo and Ngang money unchanged.",
   "business_engine_sha256": "046935677f9d88468b71246410444c27435c72e1415aeb359c799452584c36eb"
 }
