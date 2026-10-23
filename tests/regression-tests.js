@@ -95,7 +95,7 @@ async function main() {
   // ĐX/ĐA vẫn tách đài như tool cũ.
   assert.deepEqual(
     Array.from(rules.processLine("3d 22 10 dx 5n", "mt", mtSaturday)),
-    ["2d 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
+    ["3d 22 10 dx 2.5n", "3d 22 10 dx 2.5n"]
   );
 
   // Cược thường: đúng hai dòng, giữ selector, whole stake uses deterministic
@@ -209,10 +209,10 @@ assert.deepEqual(
 );
 assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday)),
-  ["dn qn 17 dx2n"]
+  ["dn qn 17 dx1n", "dn qn 17 dx1n"]
 );
 
-// DA/DAT Ngang: <5 keeps one wager; >=5 divides floor/ceil. DX remains atomic across number group.
+// DA/DAT Ngang: <5 unchanged, >=5 floor/ceil. DX splits equal half-unit money without changing numbers/stations.
 assert.deepEqual(
   Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
   ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
@@ -234,7 +234,7 @@ for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61
       ? `tp 12 52 79 ${selector} ${amount}n`
       : `2d 12 52 79 ${selector} ${amount}n`;
     const output = Array.from(rules.processLine(source, "mn", mnMonday));
-    // Ngang DX keeps its entire number group atomic; 2d contains one station-pair wager.
+    // Ngang DX splits money only; source wager amount conserved.
     const expected=amount;
     assert.equal(totalStake(output), expected, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
     assert.ok(!/\.(?:25|75)/u.test(output.join(" ")), `must not create quarter unit: ${source}`);
@@ -246,7 +246,7 @@ assert.deepEqual(
 );
 
 // MB Ngang must cut money horizontally despite a single station scope.
-  // No invented station; XC and DX stay as one original row.
+  // No invented station; XC remains unchanged, DX shares money horizontally.
   const mbStations=rules.getSchedule("mb",saturday);
   const mbLine="79 da 30n";
   assert.doesNotThrow(()=>rules.validateCheckOnlyLine(mbLine,"mb",mbStations));
@@ -254,7 +254,7 @@ assert.deepEqual(
   assert.deepEqual(Array.from(rules.processLine("79 da 4n","mb",mbStations)),["79 da 4n"]);
   assert.deepEqual(Array.from(rules.processLine("79 b 7n","mb",mbStations)),["79 b 3n","79 b 4n"]);
   assert.deepEqual(Array.from(rules.processLine("79 58 xc 20n","mb",mbStations)),["79 58 xc 20n"]);
-  assert.deepEqual(Array.from(rules.processLine("79 58 dx 5n","mb",mbStations)),["79 58 dx 5n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 58 dx 5n","mb",mbStations)),["79 58 dx 2.5n", "79 58 dx 2.5n"]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
   // A partial derived horizontal row is retained in the exact-output ledger.

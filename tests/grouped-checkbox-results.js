@@ -61,12 +61,14 @@ async function main(){
   assert.equal(groups()[0],firstGroupNode,"checking group does not replace/scroller-jump DOM");
   assert.equal(groups()[0].children[0].children[0],first,"focused checkbox stays attached");
   assert.equal(first.checked,true,"selection is reflected on same checkbox");
-  const selected=records()[0].text;
+  // Group checkbox selects ALL two equal DX half-stake children, never one.
+  const selected=records().filter(r=>r.sourceLine===1).map(r=>r.text).join("\n");
+  assert.equal(selected,"2d 52 25 dx2.5n\n2d 52 25 dx2.5n");
   await rules.copyOutput();assert.equal(clipboard.text,selected);
   await rules.cutSelectedOutput();assert.equal(clipboard.text,selected);
-  assert.ok(!rules.els.output.value.includes(selected));
+  assert.ok(!rules.els.output.value.includes("dx2.5n"),"whole DX group was cut");
   assert.equal(groups().length,1);
-  assert.equal(records().filter(r=>r.alive).length,baseline.split("\n").length-1);
+  assert.equal(records().filter(r=>r.alive).length,baseline.split("\n").length-2);
   assert.ok(rules.els.input.value.includes("3d 43 83 b10n"));
   rules.undo();assert.equal(rules.els.input.value,original);
   assert.equal(rules.els.output.value,baseline);

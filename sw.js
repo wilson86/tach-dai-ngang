@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.29-mb-dot-raw-guard-operator-dx-pairs";
+const CACHE_NAME = "tach-dai-ngang-v1.0.30-mb-dot-raw-guard-dx-horizontal-halfunit";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.29"}), {
+        new Response(JSON.stringify({version:"1.0.30"}), {
           headers: { "Content-Type": "application/json" }
         })
       )
