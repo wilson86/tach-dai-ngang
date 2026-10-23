@@ -117,7 +117,7 @@
     <textarea id="input" spellcheck="false" autocapitalize="off" autocomplete="off"
       placeholder="Dán tin hoặc đoạn chat vào đây..."></textarea>
     <div id="ledgerWork" class="ledger-work" style="display:none">
-      <div class="ledger-work-note" role="status">Tin nguồn gốc (chỉ xem). Phần cược chưa Cắt nằm ở khung Kết quả bên dưới; không gửi lại nguyên tin gốc này.</div>
+      <div id="ledgerWorkStatus" class="ledger-work-note" role="status">Nguồn còn cược (chỉ tham chiếu); không gửi lại sau khi Cắt.</div>
       <textarea id="ledgerSourceView" readonly spellcheck="false" aria-label="Tin nguồn gốc tham chiếu, chỉ đọc"></textarea>
       <div class="actions">
         <button id="ledgerCopyOriginal" class="secondary" type="button">Copy tin gốc</button>
@@ -1118,6 +1118,33 @@ function identifySemanticOutputGroups(line,region,stations,generated){
 }
 
 
+function remainingOriginalSourceLines(ledger){
+  // Pure view projection: never modify the authoritative raw source or ledger.
+  // Old records are accepted ONLY if their immutable row IDs match an exact
+  // regeneration of the corresponding physical source line.
+  if(!ledger||!Array.isArray(ledger.rows)||!ledger.origin)return null;
+  const lines=ledger.origin.split(/\r?\n/);
+  const region=regionEl.value;
+  const stations=getSchedule(region,parseLocalDate(dateEl.value||localDateISO()));
+  const sourceLines=new Set(),cache=new Map();
+  for(const r of ledger.rows){
+    const id=String(r.id||"").match(/^([1-9]\d*):([1-9]\d*):([^\n]*)$/);
+    if(!id||id[3]!==r.text)return null;
+    const n=Number(id[1]),slot=Number(id[2]);
+    if(!Number.isSafeInteger(n)||n>lines.length||!Number.isSafeInteger(slot))return null;
+    const source=lines[n-1].trim();
+    if(!source||isStandaloneSeparator(source))return null;
+    if(!cache.has(n)){
+      try{cache.set(n,processLine(source,region,stations))}
+      catch(_){return null}
+    }
+    if(cache.get(n)[slot-1]!==r.text)return null;
+    sourceLines.add(n);
+  }
+  // A partially cut source line stays visible as reference; Copy/Cut only
+  // the verified surviving RESULT rows to avoid duplicating sent wagers.
+  return lines.filter((_,i)=>sourceLines.has(i+1)).join("\n");
+}
 function renderLedgerWork(){
   // Keep the exact-output ledger INTERNAL; never show its split rows as
   // source text. A partial Cut can be unrepresentable as a replayable ticket.
@@ -1145,7 +1172,13 @@ function renderLedgerWork(){
   // Preserve original chat timestamps, physical separators and line breaks.
   // The shown source is read-only reference, never a regenerated source wager.
   reference.placeholder="";
-  reference.value=ledger.origin;
+  const remaining=remainingOriginalSourceLines(ledger);
+  reference.value=remaining===null?ledger.origin:remaining;
+  reference.setAttribute("aria-label",remaining===null?"Tin nguồn gốc, ánh xạ chưa xác minh":"Nguồn còn cược, chỉ tham chiếu");
+  const note=$("ledgerWorkStatus");
+  if(note)note.textContent=remaining===null?
+    "Chưa xác minh được dòng nguồn của ledger cũ. Giữ nguyên tin gốc để bảo toàn cược; chỉ Copy/Cắt tại Kết quả.":
+    "Nguồn còn cược (chỉ tham chiếu). Dòng đã Cắt hết tự biến mất; nếu đã Cắt một phần, không gửi lại dòng nguồn này. Chỉ Copy/Cắt tại Kết quả.";
   $("ledgerWorkOrigin").textContent=ledger.origin;
   $("ledgerCopyOriginal").disabled=!ledger.origin;
   $("ledgerReeditOriginal").disabled=!ledger.origin;
