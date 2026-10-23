@@ -34,7 +34,7 @@ for(const [region,date,head,routes,selectors] of profiles){
     const errors=api.validateBatch(source,region,stations);
     assert.equal(errors.length,0,"unexpected validation: "+source);
     const rows=Array.from(api.processLine(source,region,stations));
-    const expectedHalfUnits=Math.round(amount*2)*(selector==="dx"?routes:1);
+    const expectedHalfUnits=Math.round(amount*2);
     let observedHalfUnits=0;
     for(const row of rows){
       const wagers=[...row.matchAll(/\b(?:dathang|dat|da|dd|dx|xc|b)\s*(\d+(?:[.,]\d+)?)(?:n|d|đ)?\b/giu)];
@@ -45,13 +45,18 @@ for(const [region,date,head,routes,selectors] of profiles){
     if(selector==="da"||selector==="dat"||selector==="dathang"){
       assert.equal(rows.length,amount<5?1:2,"Ngang DA threshold mismatch: "+source);
     }
-    if(selector==="dx"&&head.startsWith("3d")){
-      assert.equal(rows.length,3,"Ngang DX must retain one numeric group in three station pairs: "+source);
-      assert.ok(rows[0].startsWith("2d "),"main DX pair must have 2d prefix: "+source);
+    if(selector==="dx"){
+      assert.equal(rows.length,amount===0.5?1:2,"Ngang DX must split one amount into two horizontal shares when possible: "+source);
+      assert.ok(rows.every(row=>row.startsWith(head+" ")),"Ngang DX must retain original station selector and all numbers: "+source);
+      if(Math.round(amount*2)%2===0){
+        const expectedShare=amount/2;
+        assert.ok(rows.every(row=>new RegExp("\\bdx\\s*"+String(expectedShare).replace(".","\\.")+"n$","u").test(row)),
+          "Ngang DX divisible half-unit money must be equal: "+source+" => "+rows.join(" | "));
+      }
     }
     if(selector==="xc")assert.equal(rows.length,1,"XC no split: "+source);
     tested++;
   }
 }
 assert.equal(tested,792);
-console.log("NGANG MONEY BOUNDARY 792/792 PASS (24 half-step stakes, MN/MT/MB, selectors, 2d/3d/4d)");
+console.log("NGANG MONEY BOUNDARY 792/792 PASS (DX horizontal half-unit sharing, DA threshold, MN/MT/MB)");
