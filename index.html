@@ -862,26 +862,10 @@ function moneyStakes(text){
 }
 
 
-function pairExposureAdjustments(line,region){
-  // Independent Ngang money oracle. Literal DX multiplies by station pairs
-  // only; its number-group remains atomic. DA/DAT never multiplies.
-  const source=normalizeInput(line).replace(/^(?:mn|mt|mb)\s+/iu,"");
-  const m=source.match(/^(2d|3d|4d)\s+(.+)$/iu);
-  if(!m||String(region||"").toLowerCase()==="mb")return {};
-  const stationPairs=m[1]==="3d"?3:m[1]==="4d"?6:1;
-  if(stationPairs===1)return {};
-  let groups;
-  try{groups=parseBetPayloadAst(m[2])}catch(_){return {}}
-  const adjustments={};
-  for(const group of groups){
-    for(const bet of group.bets){
-      if(!/^(?:dx|đx)$/iu.test(bet.selector))continue;
-      const key=canonicalMoneySelector(bet.selector);
-      const value=KTS_BUSINESS_ENGINE.parseMoney(bet.amount).halfUnits/2;
-      if(key)adjustments[key]=(adjustments[key]||0)+value*(stationPairs-1);
-    }
-  }
-  return adjustments;
+function pairExposureAdjustments(){
+  // All Ngang wagers including DX allocate the ORIGINAL stake between two rows.
+  // No multiplying by station-pair count; preserve independent money audit.
+  return {};
 }
 
 function auditMoneyConservation(sourceText,outputs,region="mn"){
@@ -926,23 +910,9 @@ function expandChunk(selector,chunk,region,stations){
   const mode=chunkMode(chunk);
   if(mode==="dx")validateNgangDxNumbers(chunk);
   if(mode==="xc")return [`${selector} ${chunk}`];
-  if(mode==="horizontal"){
-    // Ngang B/DD/etc. always cut money into 2 horizontal owner rows.
-    // DA/ĐÁ/DAT/DATHANG only split when the original stake is at least 5.
-    return splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${selector} ${c}`);
-  }
-  // DX/ĐX only: retain the ORIGINAL number group, never use Đá Vòng C(n,2).
-  if(region==="mb"||!stations.length||selector==="2d")
-    return [`${selector} ${chunk}`];
-  const n=selector==="3d"?3:selector==="4d"?4:0;
-  if(!n)return [`${selector} ${chunk}`];
-  if(stations.length<n)return [`${selector} ${chunk}`];
-  const topology=KTS_BUSINESS_ENGINE.topology(stations,n);
-  const primary=topology.primary;
-  return topology.pairs.map(pair=>{
-    const isPrimary=pair[0]===primary[0]&&pair[1]===primary[1];
-    return `${isPrimary?"2d":pair.join(" ")} ${chunk}`;
-  });
+  // All Ngang wagers including DX are HORIZONTAL.
+  // Preserve original selector and the entire number group.
+  return splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${selector} ${c}`);
 }
 
 function processLine(line,region,stations){
@@ -950,13 +920,14 @@ function processLine(line,region,stations){
   if(!s)return [];
   const mr=s.match(/^(mn|mt|mb)\s+(.+)$/);
   if(mr){ s=mr[2].trim(); }
-  // MB has no station topology, but its wager amounts must still be cut
-  // horizontally. Never manufacture a second station or expand XC/DX.
+  // MB Ngang also cuts DX horizontally. Do not manufacture new stations.
   if(region==="mb"&&/^\d/.test(s)){
     const chunks=splitBetChunks(s),out=[];
     for(const chunk of chunks){
-      if(chunkMode(chunk)==="horizontal")
+      if(chunkMode(chunk)!=="xc"){
+        if(chunkMode(chunk)==="dx")validateNgangDxNumbers(chunk);
         out.push(...splitHorizontalChunk(chunk,2).filter(Boolean));
+      }
       else out.push(chunk);
     }
     return out.length?out:[s];
@@ -978,7 +949,8 @@ function processLine(line,region,stations){
 
           if(mode==="xc"){
             out.push(`${station} ${chunk}`);
-          }else if(mode==="horizontal"){
+          }else if(mode==="horizontal"||mode==="dx"){
+            if(mode==="dx")validateNgangDxNumbers(chunk);
             out.push(...splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${station} ${c}`));
           }else{
             out.push(`${station} ${chunk}`);
@@ -1001,7 +973,7 @@ function processLine(line,region,stations){
           if(mode==="horizontal"){
             out.push(...expandChunk("2d",chunk,region,stations));
           }else if(mode==="dx"){
-            out.push(`${st1} ${st2} ${chunk}`);
+            out.push(...splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${st1} ${st2} ${c}`));
           }else out.push(`${st1} ${st2} ${chunk}`);
         }
 
