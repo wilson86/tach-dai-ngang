@@ -1,5 +1,5 @@
 "use strict";
-// Explicit candidate/NEEDS_ORACLE source fixture; business money engine unchanged.
+// Approved MB Ngang horizontal split: chat normalization never changes money amounts; engine unchanged.
 const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const root=path.resolve(__dirname,"..");
 const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
@@ -25,8 +25,8 @@ const cleaned=rules.preprocessChatText(original);
 assert.equal(cleaned,"32 b20n\n52 79 b50n da10n","only leading single dot and chat envelope are removed");
 const lines=cleaned.split("\n");
 for(const line of lines)assert.doesNotThrow(()=>rules.validateCheckOnlyLine(line,region,stations));
-assert.deepEqual(Array.from(rules.processLine(lines[0],region,stations)),["32 b20n"]);
-assert.deepEqual(Array.from(rules.processLine(lines[1],region,stations)),["52 79 b50n da10n"]);
+assert.deepEqual(Array.from(rules.processLine(lines[0],region,stations)),["32 b10n","32 b10n"]);
+assert.deepEqual(Array.from(rules.processLine(lines[1],region,stations)),["52 79 b25n da5n","52 79 b25n da5n"]);
 assert.equal(rules.normalizeInput(". 32 b20n"),"32 b20n");
 assert.equal(rules.normalizeInput("52.79.b50n.da10n"),"52 79 b50n da10n");
 assert.equal(rules.normalizeInput("32 b10.50n"),"32 b10.50n","money decimal never split");
