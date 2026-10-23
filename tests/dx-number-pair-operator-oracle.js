@@ -55,8 +55,8 @@ async function main(){
   assert.equal(a.auditMoneyConservation(original,rows.slice(1),"mn").status,"FAIL",
     "missing primary wager must fail money audit");
   // Idempotence of the abstract primary pair; no station-name substitution.
-  assert.deepEqual(a.processLine("2d 28 82 dx 1n","mn",
-    a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00"))),
+  assert.deepEqual(Array.from(a.processLine("2d 28 82 dx 1n","mn",
+    a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00")))),
     ["2d 28 82 dx 1n"]);
   const four=a.processLine("4d 28 82 68 86 dx 1n","mn",
     a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00")));
