@@ -43,5 +43,10 @@ jobs:
           node tests/source-output-cut-conservation.js
           node tests/realtime-arbitrary-row-cut.contract.js
           node tests/grouped-checkbox-results.js
+      - name: Working source-line Cut and protected ledger
+        run: |
+          node tests/source-cut-working-provenance.js
+          node tests/source-pane-after-result-cut.js
+          node tests/ledger-readable-working-ui.js
       - name: PWA release assets consistency
         run: node tests/release-review-asset-consistency.js
