@@ -1,5 +1,5 @@
 {
-  "version": "1.0.30",
+  "version": "1.0.31",
   "updated": "2026-10-24",
   "app": "tach-dai-ngang",
   "notes": "Ngang DX horizontal equal half-unit money 3n to 1.5n+1.5n; generated engine unchanged; candidate QA pending",
