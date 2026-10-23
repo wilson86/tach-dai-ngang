@@ -212,18 +212,18 @@ assert.deepEqual(
   ["dn qn 17 dx2n"]
 );
 
-// DA/DAT Ngang: always split and conserve the original selector stake.
+// DA/DAT Ngang: <5 keeps one wager; >=5 divides floor/ceil. DX remains atomic across number group.
 assert.deepEqual(
   Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
   ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
 );
   assert.deepEqual(
     Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
-    ["tp 31 91 dat 2n", "tp 31 91 dat 2n"]
+    ["tp 31 91 dat 4n"]
 );
 assert.deepEqual(
   Array.from(rules.processLine("tp 12 52 79 dd 60n da 2n", "mn", mnMonday)),
-  ["tp 12 52 79 dd 30n dat 1n", "tp 12 52 79 dd 30n dat 1n"]
+  ["tp 12 52 79 dd 30n dat 2n", "tp 12 52 79 dd 30n"]
 );
 
 // P0 money conservation: quotient/remainder is in half-units. No generated
@@ -234,16 +234,15 @@ for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61
       ? `tp 12 52 79 ${selector} ${amount}n`
       : `2d 12 52 79 ${selector} ${amount}n`;
     const output = Array.from(rules.processLine(source, "mn", mnMonday));
-    // DX 3 distinct numbers means C(3,2)=3 complete number-pair wagers;
-    // ordinary horizontal selectors conserve the single source amount.
-    const expected=selector==="dx"?amount*3:amount;
+    // Ngang DX keeps its entire number group atomic; 2d contains one station-pair wager.
+    const expected=amount;
     assert.equal(totalStake(output), expected, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
     assert.ok(!/\.(?:25|75)/u.test(output.join(" ")), `must not create quarter unit: ${source}`);
   }
 }
 assert.deepEqual(
   Array.from(rules.processLine("tp 12 52 dd 2n dat 1n", "mn", mnMonday)),
-  ["tp 12 52 dd 1n", "tp 12 52 dd 1n dat 1n"]
+  ["tp 12 52 dd 1n dat 1n", "tp 12 52 dd 1n"]
 );
 
 // MB chỉ kiểm tra, không tách/cắt ngang.
