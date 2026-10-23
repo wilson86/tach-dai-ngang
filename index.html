@@ -980,7 +980,9 @@ function expandChunk(selector,chunk,region,stations){
   if(selector==="2d"){
     const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
     if((explicitDx||isContextualDaPair(chunk,selector,region)) && stations.length>=2)
-      return pairChunks.map(c=>`${stations[0][0]} ${stations[1][0]} ${c}`);
+      // Ngang: 2d is the PRIMARY PAIR ROLE, not an expanded station-pair name.
+      // Leaving it as 2d also makes an already-split primary row idempotent.
+      return pairChunks.map(c=>`2d ${c}`);
     return pairChunks.map(c=>`2d ${c}`);
   }
   if(stations.length<3) return pairChunks.map(c=>`${selector} ${c}`);
@@ -990,7 +992,14 @@ function expandChunk(selector,chunk,region,stations){
   const selected=topology.stations;
   const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
   if(explicitDx||isContextualDaPair(chunk,selector,region)){
-    return pairChunks.flatMap(c=>topology.pairs.map(pair=>`${pair.join(" ")} ${c}`));
+    // Ngang's primary/main pair is always the abstract 2d role. Only
+    // main–auxiliary and auxiliary–auxiliary pairs use explicit station names.
+    // This is intentionally DISTINCT from Mobile (which materializes all pairs).
+    const primary=topology.primary;
+    return pairChunks.flatMap(c=>topology.pairs.map(pair=>{
+      const isPrimary=pair[0]===primary[0]&&pair[1]===primary[1];
+      return `${isPrimary?"2d":pair.join(" ")} ${c}`;
+    }));
   }
   const prefixes=["2d",...selected.slice(2).map(x=>x[0])];
   return splitHorizontalChunk(chunk,prefixes.length).filter(Boolean).map((part,index)=>`${prefixes[index]} ${part}`);
