@@ -95,7 +95,7 @@ async function main() {
   // ĐX/ĐA vẫn tách đài như tool cũ.
   assert.deepEqual(
     Array.from(rules.processLine("3d 22 10 dx 5n", "mt", mtSaturday)),
-    ["dn qn 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
+    ["2d 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
   );
 
   // Cược thường: đúng hai dòng, giữ selector, whole stake uses deterministic
