@@ -950,6 +950,17 @@ function processLine(line,region,stations){
   if(!s)return [];
   const mr=s.match(/^(mn|mt|mb)\s+(.+)$/);
   if(mr){ s=mr[2].trim(); }
+  // MB has no station topology, but its wager amounts must still be cut
+  // horizontally. Never manufacture a second station or expand XC/DX.
+  if(region==="mb"&&/^\d/.test(s)){
+    const chunks=splitBetChunks(s),out=[];
+    for(const chunk of chunks){
+      if(chunkMode(chunk)==="horizontal")
+        out.push(...splitHorizontalChunk(chunk,2).filter(Boolean));
+      else out.push(chunk);
+    }
+    return out.length?out:[s];
+  }
   const m=s.match(/^(2d|3d|4d)\s+(.+)$/);
   if(!m){
     const toks=s.split(/\s+/).filter(Boolean);
