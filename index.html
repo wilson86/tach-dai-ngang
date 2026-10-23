@@ -881,8 +881,54 @@ function auditMoneyConservation(sourceText,outputs){
   return {status:rows.every(row=>row.ok)?"PASS":"FAIL",rows};
 }
 
+
+function contextualDaChunks(chunks,selector,region){
+  if(region==="mb"||(selector!=="2d"&&selector!=="3d"))return chunks;
+  const result=[];
+  for(const chunk of chunks){
+    const toks=chunk.trim().split(/\s+/).filter(Boolean);
+    let i=0;
+    while(i<toks.length&&isNumberToken(toks[i])&&!isBetType(toks[i]))i++;
+    if(!i){result.push(chunk);continue;}
+    const prefix=toks.slice(0,i).join(" "),parts=[];
+    let kind=null,body=[];
+    for(;i<toks.length;){
+      const compact=splitCompactBetToken(toks[i]),bet=compact?compact[0]:toks[i];
+      if(!isBetType(bet))throw Error("KHÔNG NHẬN RA CƯỢC TRONG NHÓM ĐÁ");
+      const nextKind=/^(?:da|đá|đa)$/iu.test(bet)?"pair":"other";
+      if(kind!==null&&nextKind!==kind){parts.push(prefix+" "+body.join(" "));body=[];}
+      kind=nextKind;
+      if(compact){body.push(toks[i]);i++;}
+      else{if(!isMoneyToken(toks[i+1]||""))throw Error("THIẾU TIỀN SAU CƯỢC ĐÁ");body.push(toks[i],toks[i+1]);i+=2;}
+    }
+    if(body.length)parts.push(prefix+" "+body.join(" "));
+    result.push(...parts);
+  }
+  return result;
+}
+function isContextualDaPair(chunk,selector,region){
+  if(region==="mb"||(selector!=="2d"&&selector!=="3d"))return false;
+  const groups=parseBetPayloadAst(chunk);
+  return groups.length>0&&groups.every(g=>g.bets.length>0&&g.bets.every(b=>/^(?:da|đá|đa)$/iu.test(b.selector)));
+}
+function expandPairNumberChunks(chunk){
+  const tokens=String(chunk||"").trim().split(/\s+/).filter(Boolean);
+  let i=0;
+  while(i<tokens.length&&isNumberToken(tokens[i])&&!isBetType(tokens[i]))i++;
+  const numbers=tokens.slice(0,i);
+  if(numbers.length<3)return [chunk];
+  if(numbers.length>40)throw Error("QUÁ NHIỀU SỐ ĐÁ: cần chia nhóm nhỏ để kiểm tra");
+  if(numbers.some(n=>!/^[0-9]{2}$/u.test(n)))throw Error("SỐ ĐÁ PHẢI ĐỦ HAI CHỮ SỐ (01, 02...)");
+  if(new Set(numbers).size!==numbers.length)throw Error("TRÙNG SỐ TRONG NHÓM ĐÁ");
+  const suffix=tokens.slice(i).join(" ");
+  if(!suffix)throw Error("THIẾU LOẠI CƯỢC VÀ TIỀN ĐÁ");
+  const pairs=[];
+  for(let a=0;a<numbers.length-1;a++)for(let b=a+1;b<numbers.length;b++)pairs.push(numbers[a]+" "+numbers[b]+" "+suffix);
+  return pairs;
+}
+
 function expandChunk(selector,chunk,region,stations){
-  const mode=chunkMode(chunk);
+  const mode=isContextualDaPair(chunk,selector,region)?"dx":chunkMode(chunk);
 
   if(mode==="xc") return [`${selector} ${chunk}`];
 
@@ -890,24 +936,23 @@ function expandChunk(selector,chunk,region,stations){
     return splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${selector} ${c}`);
   }
 
-  // DX/ĐX old station split
-  if(!stations.length) return [`${selector} ${chunk}`];
+  // Number-pair combinations retain the full stake on every station pair.
+  const pairChunks=expandPairNumberChunks(chunk);
+  if(!stations.length) return pairChunks.map(c=>`${selector} ${c}`);
   if(selector==="2d"){
     const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
-    if(explicitDx && stations.length>=2) return [`${stations[0][0]} ${stations[1][0]} ${chunk}`];
-    return [`2d ${chunk}`];
+    if((explicitDx||isContextualDaPair(chunk,selector,region)) && stations.length>=2)
+      return pairChunks.map(c=>`${stations[0][0]} ${stations[1][0]} ${c}`);
+    return pairChunks.map(c=>`2d ${c}`);
   }
-  if(stations.length<3) return [`${selector} ${chunk}`];
+  if(stations.length<3) return pairChunks.map(c=>`${selector} ${c}`);
 
   const n=selector==="3d"?3:4;
   const topology=KTS_BUSINESS_ENGINE.topology(stations,n);
   const selected=topology.stations;
   const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
-  if(explicitDx){
-    // Materialise each unordered pair from the authoritative schedule order.
-    // A role shorthand (`2d`) cannot prove the primary pair identity, and a
-    // reversed spelling must never be accepted as a second topology edge.
-    return topology.pairs.map(pair=>`${pair.join(" ")} ${chunk}`);
+  if(explicitDx||isContextualDaPair(chunk,selector,region)){
+    return pairChunks.flatMap(c=>topology.pairs.map(pair=>`${pair.join(" ")} ${c}`));
   }
   const prefixes=["2d",...selected.slice(2).map(x=>x[0])];
   return splitHorizontalChunk(chunk,prefixes.length).filter(Boolean).map((part,index)=>`${prefixes[index]} ${part}`);
@@ -948,19 +993,17 @@ function processLine(line,region,stations){
       if(stationCount===2){
         const st1=toks[0],st2=toks[1];
         const rest=toks.slice(2).join(" ");
-        const chunks=splitBetChunks(rest);
+        const chunks=contextualDaChunks(splitBetChunks(rest),"2d",region);
         const out=[];
 
         for(const chunk of chunks){
           const mode=chunkMode(chunk);
 
-          if(mode==="horizontal"){
-            // Hai đài cụ thể + cược ngang => canonical selector 2d.
+          if(mode==="horizontal"&&!isContextualDaPair(chunk,"2d",region)){
             out.push(...expandChunk("2d",chunk,region,stations));
-          }else{
-            // XC giữ nguyên; DX/ĐX là cặp đài cụ thể nên giữ nguyên cặp.
-            out.push(`${st1} ${st2} ${chunk}`);
-          }
+          }else if(mode==="dx"||isContextualDaPair(chunk,"2d",region)){
+            out.push(...expandPairNumberChunks(chunk).map(c=>`${st1} ${st2} ${c}`));
+          }else out.push(`${st1} ${st2} ${chunk}`);
         }
 
         return out.length?out:[s];
@@ -968,7 +1011,7 @@ function processLine(line,region,stations){
     }
     return [s];
   }
-  const chunks=splitBetChunks(m[2].trim());
+  const chunks=contextualDaChunks(splitBetChunks(m[2].trim()),m[1],region);
   if(!chunks.length)return [s];
   const out=[];
   for(const c of chunks) out.push(...expandChunk(m[1],c,region,stations));
