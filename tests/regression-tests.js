@@ -95,7 +95,7 @@ async function main() {
   // ĐX/ĐA vẫn tách đài như tool cũ.
   assert.deepEqual(
     Array.from(rules.processLine("3d 22 10 dx 5n", "mt", mtSaturday)),
-    ["dn qn 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
+    ["2d 22 10 dx 5n", "dn dno 22 10 dx 5n", "qn dno 22 10 dx 5n"]
   );
 
   // Cược thường: đúng hai dòng, giữ selector, whole stake uses deterministic
@@ -212,18 +212,18 @@ assert.deepEqual(
   ["dn qn 17 dx2n"]
 );
 
-// DA/DAT Ngang: always split and conserve the original selector stake.
+// DA/DAT Ngang: <5 keeps one wager; >=5 divides floor/ceil. DX remains atomic across number group.
 assert.deepEqual(
   Array.from(rules.processLine("tp 31 91 da 7n", "mn", mnMonday)),
   ["tp 31 91 dat 3n", "tp 31 91 dat 4n"]
 );
   assert.deepEqual(
     Array.from(rules.processLine("tp 31 91 da 4n", "mn", mnMonday)),
-    ["tp 31 91 dat 2n", "tp 31 91 dat 2n"]
+    ["tp 31 91 dat 4n"]
 );
 assert.deepEqual(
   Array.from(rules.processLine("tp 12 52 79 dd 60n da 2n", "mn", mnMonday)),
-  ["tp 12 52 79 dd 30n dat 1n", "tp 12 52 79 dd 30n dat 1n"]
+  ["tp 12 52 79 dd 30n dat 2n", "tp 12 52 79 dd 30n"]
 );
 
 // P0 money conservation: quotient/remainder is in half-units. No generated
@@ -234,19 +234,27 @@ for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61
       ? `tp 12 52 79 ${selector} ${amount}n`
       : `2d 12 52 79 ${selector} ${amount}n`;
     const output = Array.from(rules.processLine(source, "mn", mnMonday));
-    assert.equal(totalStake(output), amount, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
+    // Ngang DX keeps its entire number group atomic; 2d contains one station-pair wager.
+    const expected=amount;
+    assert.equal(totalStake(output), expected, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
     assert.ok(!/\.(?:25|75)/u.test(output.join(" ")), `must not create quarter unit: ${source}`);
   }
 }
 assert.deepEqual(
   Array.from(rules.processLine("tp 12 52 dd 2n dat 1n", "mn", mnMonday)),
-  ["tp 12 52 dd 1n", "tp 12 52 dd 1n dat 1n"]
+  ["tp 12 52 dd 1n dat 1n", "tp 12 52 dd 1n"]
 );
 
-// MB chỉ kiểm tra, không tách/cắt ngang.
-  const mbLine = "79 da 30n";
-  assert.doesNotThrow(() => rules.validateCheckOnlyLine(mbLine, "mb", rules.getSchedule("mb", saturday)));
-  assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);
+// MB Ngang must cut money horizontally despite a single station scope.
+  // No invented station; XC and DX stay as one original row.
+  const mbStations=rules.getSchedule("mb",saturday);
+  const mbLine="79 da 30n";
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(mbLine,"mb",mbStations));
+  assert.deepEqual(Array.from(rules.processLine(mbLine,"mb",mbStations)),["79 da 15n","79 da 15n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 da 4n","mb",mbStations)),["79 da 4n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 b 7n","mb",mbStations)),["79 b 3n","79 b 4n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 58 xc 20n","mb",mbStations)),["79 58 xc 20n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 58 dx 5n","mb",mbStations)),["79 58 dx 5n"]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
   // A partial derived horizontal row is retained in the exact-output ledger.

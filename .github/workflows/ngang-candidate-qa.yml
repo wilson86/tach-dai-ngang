@@ -1,0 +1,47 @@
+name: Ngang Candidate Zero-Cost Node QA
+
+on:
+  pull_request:
+    paths:
+      - "index.html"
+      - "business_engine.generated.js"
+      - "station_calendar.generated.js"
+      - "tests/**"
+      - ".github/workflows/ngang-candidate-qa.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ngang-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  node-qa:
+    name: Native Node candidate review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+      - name: Node runtime
+        run: node --version
+      - name: Validate Ngang source syntax
+        run: |
+          node --check tests/dx-number-pair-operator-oracle.js
+          node --check tests/regression-tests.js
+      - name: Operator money + branch independence
+        run: node tests/dx-number-pair-operator-oracle.js
+      - name: Independent money boundary matrix (792 cases)
+        run: node tests/ngang-money-boundary-matrix.js
+      - name: Existing Ngang regression
+        run: node tests/regression-tests.js
+      - name: MB normalization + horizontal money
+        run: node tests/mb-leading-dot-chat-envelope.js
+      - name: Source Cut / Undo / ledger
+        run: |
+          node tests/source-output-cut-conservation.js
+          node tests/realtime-arbitrary-row-cut.contract.js
+          node tests/grouped-checkbox-results.js
+      - name: PWA release assets consistency
+        run: node tests/release-review-asset-consistency.js

@@ -91,7 +91,7 @@
     <button id="updateNowBtn" style="height:38px;margin-left:8px;background:#0b57d0;color:#fff;border:0;border-radius:9px;padding:0 12px;font-weight:700">Cập nhật ngay</button>
   </div>
 
-  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.28</span></div>
+  <div class="title">Tách Đài Ngang 3 Miền <span style="font-size:12px;color:#667085">v1.0.29</span></div>
 
   <div class="card">
     <div class="controls">
@@ -121,6 +121,7 @@
       <textarea id="ledgerSourceView" readonly spellcheck="false" aria-label="Tin nguồn gốc tham chiếu, chỉ đọc"></textarea>
       <div class="actions">
         <button id="ledgerCopyOriginal" class="secondary" type="button">Copy tin gốc</button>
+        <button id="ledgerReeditOriginal" class="secondary" type="button">Sửa tin gốc (làm lại từ đầu)</button>
       </div>
       <!-- Legacy ledger controls intentionally inert. All result Copy/Cut/checkboxes stay in the RESULT pane. -->
       <div id="ledgerWorkRows" style="display:none"></div>
@@ -816,7 +817,7 @@ function splitHorizontalChunk(chunk,count=2){
 
     if(compact){
       const [bet,money]=compact;
-      const amounts=distributeAmountExactly(money,count);
+      const amounts=ngangStakeAllocations(bet,money,count);
       amounts.forEach((amount,index)=>{
         if(amount!==null){ out[index].push(bet+amount); hasStake[index]=true; }
       });
@@ -826,7 +827,7 @@ function splitHorizontalChunk(chunk,count=2){
     if(isBetType(tok)){
       const bet=tok;
       if(i+1<toks.length && isMoneyToken(toks[i+1])){
-        const amounts=distributeAmountExactly(toks[i+1],count);
+        const amounts=ngangStakeAllocations(bet,toks[i+1],count);
         amounts.forEach((amount,index)=>{
           if(amount!==null){ out[index].push(bet,amount); hasStake[index]=true; }
         });
@@ -859,20 +860,36 @@ function moneyStakes(text){
   }
   return totals;
 }
-function auditMoneyConservation(sourceText,outputs){
-  const input=moneyStakes(sourceText),output={};
-  // Explicit 3d/4d DX is a unit stake on every unordered station pair.
-  // Ordinary selectors remain total-to-distribute and are not multiplied.
-  String(sourceText||"").split(/\r?\n/).forEach(line=>{
-    const mode=String(line).match(/\b([34])d\b/i),tokens=String(line).split(/\s+/).filter(Boolean);
-    let dx;
-    for(let i=0;i<tokens.length;i++){
-      const compact=tokens[i].match(/^(?:dx|đx)(\d+(?:[.,]\d+)?)(?:n|d)?$/iu);
-      if(compact){dx=(dx||0)+Number(compact[1].replace(",","."));continue;}
-      if(/^(?:dx|đx)$/iu.test(tokens[i])){const money=parseMoneyToken(tokens[i+1]||"");if(money){dx=(dx||0)+money.value;i++;}}
+
+
+function pairExposureAdjustments(line,region){
+  // Independent Ngang money oracle. Literal DX multiplies by station pairs
+  // only; its number-group remains atomic. DA/DAT never multiplies.
+  const source=normalizeInput(line).replace(/^(?:mn|mt|mb)\s+/iu,"");
+  const m=source.match(/^(2d|3d|4d)\s+(.+)$/iu);
+  if(!m||String(region||"").toLowerCase()==="mb")return {};
+  const stationPairs=m[1]==="3d"?3:m[1]==="4d"?6:1;
+  if(stationPairs===1)return {};
+  let groups;
+  try{groups=parseBetPayloadAst(m[2])}catch(_){return {}}
+  const adjustments={};
+  for(const group of groups){
+    for(const bet of group.bets){
+      if(!/^(?:dx|đx)$/iu.test(bet.selector))continue;
+      const key=canonicalMoneySelector(bet.selector);
+      const value=KTS_BUSINESS_ENGINE.parseMoney(bet.amount).halfUnits/2;
+      if(key)adjustments[key]=(adjustments[key]||0)+value*(stationPairs-1);
     }
-    if(mode&&dx!==undefined){const n=Number(mode[1]),pairs=n*(n-1)/2;input.DX=(input.DX||0)+dx*(pairs-1);}
-  });
+  }
+  return adjustments;
+}
+
+function auditMoneyConservation(sourceText,outputs,region="mn"){
+  const input=moneyStakes(sourceText),output={};
+  for(const line of String(sourceText||"").split(/\r?\n/)){
+    for(const [key,delta] of Object.entries(pairExposureAdjustments(line,region)))
+      input[key]=(input[key]||0)+delta;
+  }
   (outputs||[]).forEach(line=>Object.entries(moneyStakes(line)).forEach(([key,value])=>output[key]=(output[key]||0)+value));
   const rows=Array.from(new Set([...Object.keys(input),...Object.keys(output)])).sort().map(selector=>{
     const original=input[selector]||0,parsed=output[selector]||0,delta=parsed-original;
@@ -881,36 +898,51 @@ function auditMoneyConservation(sourceText,outputs){
   return {status:rows.every(row=>row.ok)?"PASS":"FAIL",rows};
 }
 
+
+function isNgangDaBet(bet){
+  return /^(?:da|đá|đa|dat|dathang)$/iu.test(String(bet||""));
+}
+function ngangStakeAllocations(bet,amount,count=2){
+  // DA/DAT/DATHANG below 5 stay as ONE original wager. From 5, cut
+  // horizontally (floor/ceil for whole n), never multiply by station/number pairs.
+  const stake=KTS_BUSINESS_ENGINE.parseMoney(amount);
+  if(isNgangDaBet(bet)&&stake.halfUnits<10)
+    return [amount,...Array(count-1).fill(null)];
+  return distributeAmountExactly(amount,count);
+}
+
+
+function validateNgangDxNumbers(chunk){
+  // Width-only preflight. An explicitly named station pair may have one
+  // numeric token even though generic 2d/3d validation requires two.
+  const toks=String(chunk||"").trim().split(/\s+/).filter(Boolean);
+  let i=0;
+  while(i<toks.length&&isNumberToken(toks[i])&&!isBetType(toks[i]))i++;
+  if(toks.slice(0,i).some(n=>!/^\d{2}$/u.test(n)))
+    throw Error("DX/ĐX phải nhập số đá đúng hai chữ số, ví dụ 01 02");
+}
+
 function expandChunk(selector,chunk,region,stations){
   const mode=chunkMode(chunk);
-
-  if(mode==="xc") return [`${selector} ${chunk}`];
-
+  if(mode==="dx")validateNgangDxNumbers(chunk);
+  if(mode==="xc")return [`${selector} ${chunk}`];
   if(mode==="horizontal"){
+    // Ngang B/DD/etc. always cut money into 2 horizontal owner rows.
+    // DA/ĐÁ/DAT/DATHANG only split when the original stake is at least 5.
     return splitHorizontalChunk(chunk,2).filter(Boolean).map(c=>`${selector} ${c}`);
   }
-
-  // DX/ĐX old station split
-  if(!stations.length) return [`${selector} ${chunk}`];
-  if(selector==="2d"){
-    const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
-    if(explicitDx && stations.length>=2) return [`${stations[0][0]} ${stations[1][0]} ${chunk}`];
-    return [`2d ${chunk}`];
-  }
-  if(stations.length<3) return [`${selector} ${chunk}`];
-
-  const n=selector==="3d"?3:4;
+  // DX/ĐX only: retain the ORIGINAL number group, never use Đá Vòng C(n,2).
+  if(region==="mb"||!stations.length||selector==="2d")
+    return [`${selector} ${chunk}`];
+  const n=selector==="3d"?3:selector==="4d"?4:0;
+  if(!n)return [`${selector} ${chunk}`];
+  if(stations.length<n)return [`${selector} ${chunk}`];
   const topology=KTS_BUSINESS_ENGINE.topology(stations,n);
-  const selected=topology.stations;
-  const explicitDx=/(?:^|\s)(?:dx|đx)(?=\s|\d)/iu.test(chunk);
-  if(explicitDx){
-    // Materialise each unordered pair from the authoritative schedule order.
-    // A role shorthand (`2d`) cannot prove the primary pair identity, and a
-    // reversed spelling must never be accepted as a second topology edge.
-    return topology.pairs.map(pair=>`${pair.join(" ")} ${chunk}`);
-  }
-  const prefixes=["2d",...selected.slice(2).map(x=>x[0])];
-  return splitHorizontalChunk(chunk,prefixes.length).filter(Boolean).map((part,index)=>`${prefixes[index]} ${part}`);
+  const primary=topology.primary;
+  return topology.pairs.map(pair=>{
+    const isPrimary=pair[0]===primary[0]&&pair[1]===primary[1];
+    return `${isPrimary?"2d":pair.join(" ")} ${chunk}`;
+  });
 }
 
 function processLine(line,region,stations){
@@ -918,6 +950,17 @@ function processLine(line,region,stations){
   if(!s)return [];
   const mr=s.match(/^(mn|mt|mb)\s+(.+)$/);
   if(mr){ s=mr[2].trim(); }
+  // MB has no station topology, but its wager amounts must still be cut
+  // horizontally. Never manufacture a second station or expand XC/DX.
+  if(region==="mb"&&/^\d/.test(s)){
+    const chunks=splitBetChunks(s),out=[];
+    for(const chunk of chunks){
+      if(chunkMode(chunk)==="horizontal")
+        out.push(...splitHorizontalChunk(chunk,2).filter(Boolean));
+      else out.push(chunk);
+    }
+    return out.length?out:[s];
+  }
   const m=s.match(/^(2d|3d|4d)\s+(.+)$/);
   if(!m){
     const toks=s.split(/\s+/).filter(Boolean);
@@ -953,14 +996,13 @@ function processLine(line,region,stations){
 
         for(const chunk of chunks){
           const mode=chunkMode(chunk);
+          if(mode==="dx")validateNgangDxNumbers(chunk);
 
           if(mode==="horizontal"){
-            // Hai đài cụ thể + cược ngang => canonical selector 2d.
             out.push(...expandChunk("2d",chunk,region,stations));
-          }else{
-            // XC giữ nguyên; DX/ĐX là cặp đài cụ thể nên giữ nguyên cặp.
+          }else if(mode==="dx"){
             out.push(`${st1} ${st2} ${chunk}`);
-          }
+          }else out.push(`${st1} ${st2} ${chunk}`);
         }
 
         return out.length?out:[s];
@@ -984,8 +1026,11 @@ function validateBatch(text,region,stations){
   const errors=[];
   text.split(/\r?\n/).forEach((raw,idx)=>{
     raw=raw.trim(); if(!raw || isStandaloneSeparator(raw))return;
-    try{validateCheckOnlyLine(raw,region,stations);}
-    catch(e){errors.push({line:idx+1,msg:e.message,raw});}
+    try{
+      validateCheckOnlyLine(raw,region,stations);
+      // Preflight output expansion before any row is materialized: atomic HOLD.
+      processLine(raw,region,stations);
+    }catch(e){errors.push({line:idx+1,msg:e.message,raw});}
   });
   return errors;
 }
@@ -1116,6 +1161,7 @@ function renderLedgerWork(){
     reference.placeholder="Ledger không hợp lệ hoặc sai miền/ngày/engine; không được gửi như tin cược.";
     $("ledgerWorkOrigin").textContent="";
     $("ledgerCopyOriginal").disabled=true;
+    $("ledgerReeditOriginal").disabled=true;
     return;
   }
   // Preserve original chat timestamps, physical separators and line breaks.
@@ -1124,6 +1170,22 @@ function renderLedgerWork(){
   reference.value=ledger.origin;
   $("ledgerWorkOrigin").textContent=ledger.origin;
   $("ledgerCopyOriginal").disabled=!ledger.origin;
+  $("ledgerReeditOriginal").disabled=!ledger.origin;
+}
+function reeditOriginalAfterCut(){
+  const ledger=parseExactOutputLedger(inputEl.value);
+  if(!ledger||!ledger.origin){setStatus("Tin gốc không hợp lệ; không thể mở để sửa.","err");return;}
+  const approved=window.confirm("Sửa lại tin gốc sẽ HỦY danh sách cược chưa Cắt đang hiển thị. Cược đã Copy/Cắt trước đó KHÔNG tự thu hồi. Chỉ tách lại sau khi đối chiếu, tránh gửi trùng. Tiếp tục?");
+  if(!approved)return;
+  snapshot();
+  inputEl.value=ledger.origin;
+  outputEl.value="";
+  resetOutputRecords();
+  persistExactOutputLedger();
+  renderOutputRecords();
+  announceWorkingSource();
+  inputEl.focus();
+  setStatus("Đã mở tin gốc để sửa; kết quả cũ đã xóa. Kiểm tra cược đã gửi trước khi tách lại.","ok");
 }
 async function copySourceView(){
   if(inputEl.value.startsWith(EXACT_OUTPUT_LEDGER_PREFIX)){
@@ -1692,6 +1754,7 @@ $("selectAllInputBtn").addEventListener("click",()=>{
 });
 $("ledgerWorkSelect").addEventListener("click",()=>{toggleAllGroupedResults();renderLedgerWork();});
 $("ledgerWorkCopy").addEventListener("click",copyLedgerWork);
+$("ledgerReeditOriginal").addEventListener("click",reeditOriginalAfterCut);
 $("ledgerCopyOriginal").addEventListener("click",async()=>{
   const ledger=parseExactOutputLedger(inputEl.value);
   if(!ledger||!ledger.origin){setStatus("Không có tin gốc hợp lệ để copy.","err");return;}
@@ -1769,7 +1832,7 @@ if(parseExactOutputLedger(inputEl.value))run();
 // =========================
 // PWA / AUTO UPDATE
 // =========================
-const APP_VERSION = "1.0.28";
+const APP_VERSION = "1.0.29";
 let swRegistration = null;
 
 async function checkForAppUpdate() {
