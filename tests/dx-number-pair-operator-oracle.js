@@ -1,5 +1,5 @@
 "use strict";
-// Operator-origin DX/DA regression: all unique number pairs * all unique station pairs.
+// Ngang-specific DX/DA: preserve one atomic number group per station pair; DA under 5 must not split.
 // Node-only deterministic DOM harness. No Telegram, network, live stores or user sends.
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
@@ -44,27 +44,29 @@ async function main(){
   const original="3d 28 82 68 86 dx 1n";
   a.input.value=original;a.run();
   const rows=a.output.value.split("\n");
-  assert.equal(rows.length,18,"C(4,2) x C(3,2)=18 exposures");
-  assert.equal(new Set(rows).size,18,"all 18 number/station pairs unique");
-  assert.equal(new Set(rows.map(x=>x.match(/(\d{2} \d{2}) dx/)[1])).size,6);
-  assert.deepEqual(rows.slice(0,3),["2d 28 82 dx 1n","tp bp 28 82 dx 1n","la bp 28 82 dx 1n"]);
-  assert.ok(a.records().every(r=>r.sourceLine===1),"physical source line preserved");
-  assert.ok(!rows.some(x=>/^tp la /u.test(x)), "Ngang must not mirror Mobile primary pair");
-  for(let i=0;i<rows.length;i+=3)assert.ok(rows[i].startsWith("2d "), "Ngang main branch must remain 2d");
+  assert.deepEqual(rows,[
+    "2d 28 82 68 86 dx 1n",
+    "tp bp 28 82 68 86 dx 1n",
+    "la bp 28 82 68 86 dx 1n"
+  ], "Ngang DX keeps whole number group and primary 2d, unlike Mobile");
+  assert.equal(new Set(rows).size,3);
+  assert.ok(a.records().every(r=>r.sourceLine===1));
   assert.equal(a.auditMoneyConservation(original,rows,"mn").status,"PASS");
-  // Ngang 2d primary is a stable role even when run again as a standalone ticket.
-  assert.deepEqual(a.processLine("2d 28 82 dx 1n","mn",a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00"))),["2d 28 82 dx 1n"]);
-  // Four stations have C(4,2) topology edges; only primary pair retains 2d role.
-  const four=a.processLine("4d 28 82 dx 1n","mn",a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00")));
+  assert.equal(a.auditMoneyConservation(original,rows.slice(1),"mn").status,"FAIL",
+    "missing primary wager must fail money audit");
+  // Idempotence of the abstract primary pair; no station-name substitution.
+  assert.deepEqual(a.processLine("2d 28 82 dx 1n","mn",
+    a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00"))),
+    ["2d 28 82 dx 1n"]);
+  const four=a.processLine("4d 28 82 68 86 dx 1n","mn",
+    a.getSchedule("mn",new Date("2026-10-24T12:00:00+07:00")));
   assert.equal(four.length,6);
-  assert.equal(four[0],"2d 28 82 dx 1n");
-  assert.equal(new Set(four).size,6);
+  assert.equal(four[0],"2d 28 82 68 86 dx 1n");
   assert.ok(four.slice(1).every(x=>!x.startsWith("2d ")));
-  assert.equal(a.auditMoneyConservation("4d 28 82 dx 1n",four,"mn").status,"PASS");
-  assert.equal(a.auditMoneyConservation(original,rows.slice(0,3),"mn").status,"FAIL","old three-row bug must fail audit");
+  assert.equal(a.auditMoneyConservation("4d 28 82 68 86 dx 1n",four,"mn").status,"PASS");
   const first=elements.resultGroups.children[0].children[1].children[0];
   first.checked=true;first.events.change();await a.cutSelectedOutput();
-  assert.equal(clipboard,rows[0]);assert.equal(a.output.value.split("\n").length,17);
+  assert.equal(clipboard,rows[0]);assert.equal(a.output.value.split("\n").length,2);
   const cutOutput=a.output.value,ledger=a.input.value;
   a.run();assert.equal(a.output.value,cutOutput,"no resurrection after run");
   a.reeditOriginalAfterCut();assert.equal(a.input.value,ledger,"reedit cancel preserves ledger");
@@ -76,14 +78,20 @@ async function main(){
   elements.undoBtn.events.click();
   assert.equal(a.input.value,original);assert.equal(a.output.value,rows.join("\n"));
   const da="3d 12 52 92 da 1n";a.input.value=da;a.run();
-  assert.equal(a.output.value.split("\n").length,9);
-  assert.ok(a.output.value.split("\n").filter(x=>x.startsWith("2d ")).length===3,"Ngang 3d DA must use 2d for each primary number pair");
-  assert.ok(!a.output.value.split("\n").some(x=>x.startsWith("tp la ")),"DA should not mirror Mobile");
-  assert.ok(a.output.value.split("\n").every(x=>/ da 1n$/.test(x)));
-  assert.equal(a.auditMoneyConservation(da,a.output.value.split("\n"),"mn").status,"PASS");
+  assert.equal(a.output.value,da,"DA < 5 is one Ngang row, not Đá Vòng");
+  assert.equal(a.auditMoneyConservation(da,[a.output.value],"mn").status,"PASS");
+  const da7="3d 12 52 92 da 7n";a.input.value=da7;a.run();
+  assert.deepEqual(a.output.value.split("\n"),[
+    "3d 12 52 92 da 3n","3d 12 52 92 da 4n"
+  ],"DA 7 uses floor/ceil instead of number-pair expansion");
+  assert.equal(a.auditMoneyConservation(da7,a.output.value.split("\n"),"mn").status,"PASS");
   const mixed="3d 12 52 92 b 10n da 1n";a.input.value=mixed;a.run();
-  assert.equal(a.output.value.split("\n").filter(x=>/ da 1n$/.test(x)).length,9);
+  assert.deepEqual(a.output.value.split("\n"),[
+    "3d 12 52 92 b 5n da 1n","3d 12 52 92 b 5n"
+  ]);
   assert.equal(a.auditMoneyConservation(mixed,a.output.value.split("\n"),"mn").status,"PASS");
+  const xc="3d 12 52 92 xc 10n";a.input.value=xc;a.run();
+  assert.equal(a.output.value,xc,"XC never splits horizontally");
   const invalid=original+"\n3d 12 12 92 dx 1n";a.input.value=invalid;a.run();
   assert.equal(a.records().length,0);assert.match(a.output.value,/^PHÁT HIỆN TIN SAI:/);
   a.input.value="3d 12 345 92 dx 1n";a.run();
