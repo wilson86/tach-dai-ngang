@@ -32,6 +32,8 @@ jobs:
           node --check tests/regression-tests.js
       - name: Operator money + branch independence
         run: node tests/dx-number-pair-operator-oracle.js
+      - name: Independent money boundary matrix (792 cases)
+        run: node tests/ngang-money-boundary-matrix.js
       - name: Existing Ngang regression
         run: node tests/regression-tests.js
       - name: MB normalization + horizontal money
