@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.28-mb-dot-raw-guard";
+const CACHE_NAME = "tach-dai-ngang-v1.0.28-mb-dot-raw-guard-source-pane-fix";
 const CORE_ASSETS = [
   "./",
   "./index.html",
