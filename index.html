@@ -908,6 +908,60 @@ function auditMoneyConservation(sourceText,outputs,region="mn"){
   return {status:rows.every(row=>row.ok)?"PASS":"FAIL",rows};
 }
 
+function contextualDaChunks(chunks,selector,region){
+  // On MN/MT 2d/3d, DA is a pair wager with full stake (DX semantics).
+  // Keep ordinary B/DD/etc. as separate chunks; never multiply their money.
+  if(region==="mb"||(selector!=="2d"&&selector!=="3d"))return chunks;
+  const result=[];
+  for(const chunk of chunks){
+    const toks=chunk.trim().split(/\s+/).filter(Boolean);
+    let i=0;
+    while(i<toks.length&&isNumberToken(toks[i])&&!isBetType(toks[i]))i++;
+    if(!i){result.push(chunk);continue;}
+    const prefix=toks.slice(0,i).join(" "),parts=[];
+    let kind=null,body=[];
+    for(;i<toks.length;){
+      const compact=splitCompactBetToken(toks[i]);
+      const bet=compact?compact[0]:toks[i];
+      if(!isBetType(bet)){throw Error("KHÔNG NHẬN RA CƯỢC TRONG NHÓM ĐÁ");}
+      const nextKind=/^(?:da|đá|đa)$/iu.test(bet)?"pair":"other";
+      if(kind!==null&&nextKind!==kind){parts.push(prefix+" "+body.join(" "));body=[];}
+      kind=nextKind;
+      if(compact){body.push(toks[i]);i++;}
+      else{
+        if(!isMoneyToken(toks[i+1]||""))throw Error("THIẾU TIỀN SAU CƯỢC ĐÁ");
+        body.push(toks[i],toks[i+1]);i+=2;
+      }
+    }
+    if(body.length)parts.push(prefix+" "+body.join(" "));
+    result.push(...parts);
+  }
+  return result;
+}
+function isContextualDaPair(chunk,selector,region){
+  if(region==="mb"||(selector!=="2d"&&selector!=="3d"))return false;
+  const groups=parseBetPayloadAst(chunk);
+  return groups.length>0&&groups.every(g=>g.bets.length>0&&g.bets.every(b=>/^(?:da|đá|đa)$/iu.test(b.selector)));
+}
+function expandPairNumberChunks(chunk){
+  const tokens=String(chunk||"").trim().split(/\s+/).filter(Boolean);
+  let i=0;
+  while(i<tokens.length&&isNumberToken(tokens[i])&&!isBetType(tokens[i]))i++;
+  const numbers=tokens.slice(0,i);
+  if(numbers.length<3)return [chunk]; // the already-valid two-number DX case remains identical
+  if(numbers.length>40)throw Error("QUÁ NHIỀU SỐ ĐÁ: cần chia nhóm nhỏ để kiểm tra");
+  if(numbers.some(n=>!/^[0-9]{2}$/u.test(n)))
+    throw Error("SỐ ĐÁ PHẢI ĐỦ HAI CHỮ SỐ (01, 02...)");
+  if(new Set(numbers).size!==numbers.length)throw Error("TRÙNG SỐ TRONG NHÓM ĐÁ");
+  const suffix=tokens.slice(i).join(" ");
+  if(!suffix)throw Error("THIẾU LOẠI CƯỢC VÀ TIỀN ĐÁ");
+  const pairs=[];
+  for(let a=0;a<numbers.length-1;a++)
+    for(let b=a+1;b<numbers.length;b++)
+      pairs.push(numbers[a]+" "+numbers[b]+" "+suffix);
+  return pairs;
+}
+
 function expandChunk(selector,chunk,region,stations){
   const mode=isContextualDaPair(chunk,selector,region)?"dx":chunkMode(chunk);
 
