@@ -912,8 +912,17 @@ function ngangStakeAllocations(bet,amount,count=2){
 }
 
 
+function validateNgangDxNumbers(chunk){
+  const groups=parseBetPayloadAst(chunk);
+  for(const group of groups){
+    if(!group.bets.some(b=>/^(?:dx|đx)$/iu.test(b.selector)))continue;
+    if(group.numbers.some(n=>!/^\d{2}$/u.test(n)))
+      throw Error("DX/ĐX phải nhập số đá đúng hai chữ số, ví dụ 01 02");
+  }
+}
 function expandChunk(selector,chunk,region,stations){
   const mode=chunkMode(chunk);
+  if(mode==="dx")validateNgangDxNumbers(chunk);
   if(mode==="xc")return [`${selector} ${chunk}`];
   if(mode==="horizontal"){
     // Ngang B/DD/etc. always cut money into 2 horizontal owner rows.
@@ -974,6 +983,7 @@ function processLine(line,region,stations){
 
         for(const chunk of chunks){
           const mode=chunkMode(chunk);
+          if(mode==="dx")validateNgangDxNumbers(chunk);
 
           if(mode==="horizontal"){
             out.push(...expandChunk("2d",chunk,region,stations));
