@@ -892,6 +892,12 @@ function ngangStakeAllocations(bet,amount,count=2){
   const stake=KTS_BUSINESS_ENGINE.parseMoney(amount);
   if(isNgangDaBet(bet)&&stake.halfUnits<10)
     return [amount,...Array(count-1).fill(null)];
+  if(/^(?:dx|đx)$/iu.test(bet)&&count===2&&stake.halfUnits%2===0){
+    // User-confirmed Ngang DX: 3n -> 1.5n + 1.5n (whole B/DD still 1+2).
+    // Only half-unit-representable equal shares are emitted.
+    const each=formatAmount(stake.halfUnits/4,stake.suffix,stake.comma);
+    return [each,each];
+  }
   return distributeAmountExactly(amount,count);
 }
 
