@@ -245,10 +245,16 @@ assert.deepEqual(
   ["tp 12 52 dd 1n dat 1n", "tp 12 52 dd 1n"]
 );
 
-// MB chỉ kiểm tra, không tách/cắt ngang.
-  const mbLine = "79 da 30n";
-  assert.doesNotThrow(() => rules.validateCheckOnlyLine(mbLine, "mb", rules.getSchedule("mb", saturday)));
-  assert.deepEqual(Array.from(rules.processLine(mbLine, "mb", rules.getSchedule("mb", saturday))), [mbLine]);
+// MB Ngang must cut money horizontally despite a single station scope.
+  // No invented station; XC and DX stay as one original row.
+  const mbStations=rules.getSchedule("mb",saturday);
+  const mbLine="79 da 30n";
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(mbLine,"mb",mbStations));
+  assert.deepEqual(Array.from(rules.processLine(mbLine,"mb",mbStations)),["79 da 15n","79 da 15n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 da 4n","mb",mbStations)),["79 da 4n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 b 7n","mb",mbStations)),["79 b 3n","79 b 4n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 58 xc 20n","mb",mbStations)),["79 58 xc 20n"]);
+  assert.deepEqual(Array.from(rules.processLine("79 58 dx 5n","mb",mbStations)),["79 58 dx 5n"]);
   expectThrow(() => rules.validateCheckOnlyLine("79 30n", "mb", rules.getSchedule("mb", saturday)), /thiếu loại cược/);
 
   // A partial derived horizontal row is retained in the exact-output ledger.
