@@ -913,13 +913,15 @@ function ngangStakeAllocations(bet,amount,count=2){
 
 
 function validateNgangDxNumbers(chunk){
-  const groups=parseBetPayloadAst(chunk);
-  for(const group of groups){
-    if(!group.bets.some(b=>/^(?:dx|đx)$/iu.test(b.selector)))continue;
-    if(group.numbers.some(n=>!/^\d{2}$/u.test(n)))
-      throw Error("DX/ĐX phải nhập số đá đúng hai chữ số, ví dụ 01 02");
-  }
+  // Width-only preflight. An explicitly named station pair may have one
+  // numeric token even though generic 2d/3d validation requires two.
+  const toks=String(chunk||"").trim().split(/\s+/).filter(Boolean);
+  let i=0;
+  while(i<toks.length&&isNumberToken(toks[i])&&!isBetType(toks[i]))i++;
+  if(toks.slice(0,i).some(n=>!/^\d{2}$/u.test(n)))
+    throw Error("DX/ĐX phải nhập số đá đúng hai chữ số, ví dụ 01 02");
 }
+
 function expandChunk(selector,chunk,region,stations){
   const mode=chunkMode(chunk);
   if(mode==="dx")validateNgangDxNumbers(chunk);
