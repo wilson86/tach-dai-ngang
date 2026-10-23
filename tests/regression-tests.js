@@ -234,7 +234,10 @@ for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61
       ? `tp 12 52 79 ${selector} ${amount}n`
       : `2d 12 52 79 ${selector} ${amount}n`;
     const output = Array.from(rules.processLine(source, "mn", mnMonday));
-    assert.equal(totalStake(output), amount, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
+    // DX 3 distinct numbers means C(3,2)=3 complete number-pair wagers;
+    // ordinary horizontal selectors conserve the single source amount.
+    const expected=selector==="dx"?amount*3:amount;
+    assert.equal(totalStake(output), expected, `P0 money conservation failed: ${source} => ${output.join(" | ")}`);
     assert.ok(!/\.(?:25|75)/u.test(output.join(" ")), `must not create quarter unit: ${source}`);
   }
 }
