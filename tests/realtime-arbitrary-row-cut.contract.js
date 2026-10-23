@@ -60,8 +60,10 @@ async function main(){
   const baseline=rules.els.output.value;
   assert.ok(baseline.split("\n").length>=3);
   const all=Array.from(records()).filter(r=>r.alive).map(r=>r.text);
-  const dxIndex=all.findIndex(line=>/ dx2,5n$/u.test(line));
-  assert.ok(dxIndex>=0,"DX output available for one-row CUT");
+  const dxRows=all.filter(line=>/ dx(?:1|1,5)n$/u.test(line));
+  assert.equal(dxRows.length,2,"DX 2,5n now yields two horizontal child rows");
+  const dxIndex=all.findIndex(line=>/ dx1,5n$/u.test(line));
+  assert.ok(dxIndex>=0,"DX 1,5n child row available for one-row CUT");
   const dxCheckbox=groups()[0].children[dxIndex+1].children[0];
   dxCheckbox.checked=true;dxCheckbox.events.change();
   const before=rules.els.input.value;
