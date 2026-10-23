@@ -1027,8 +1027,11 @@ function validateBatch(text,region,stations){
   const errors=[];
   text.split(/\r?\n/).forEach((raw,idx)=>{
     raw=raw.trim(); if(!raw || isStandaloneSeparator(raw))return;
-    try{validateCheckOnlyLine(raw,region,stations);}
-    catch(e){errors.push({line:idx+1,msg:e.message,raw});}
+    try{
+      validateCheckOnlyLine(raw,region,stations);
+      // Preflight output expansion before any row is materialized: atomic HOLD.
+      processLine(raw,region,stations);
+    }catch(e){errors.push({line:idx+1,msg:e.message,raw});}
   });
   return errors;
 }
