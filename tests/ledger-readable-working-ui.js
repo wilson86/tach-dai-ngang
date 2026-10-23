@@ -47,12 +47,12 @@ async function main(){
   p.run();
   assert.equal(els.ledgerWork.style.display,"none","raw input remains editable");
   const original=p.input.value;
-  assert.equal(p.records().filter(r=>r.alive).length,3);
+  assert.equal(p.records().filter(r=>r.alive).length,4);
   let dx=groups()[0].children[3].children[0];dx.checked=true;dx.events.change();
   await p.cutSelectedOutput();
   const ledger=p.input.value;
   assert.ok(ledger.startsWith("[[KTS_EXACT_OUTPUT_LEDGER_V1]]\n"));
-  assert.equal(p.output.value.split("\n").length,2);
+  assert.equal(p.output.value.split("\n").length,3);
   assert.equal(p.input.style.display,"none");
   assert.equal(els.ledgerWork.style.display,"");
   // Partially Cut source remains as reference, NOT a second result selector.
@@ -67,7 +67,7 @@ async function main(){
   p.run();assert.equal(p.output.value,survivors,"re-run must not resurrect cut DX");
   p.undo();
   assert.equal(p.input.value,original);
-  assert.equal(p.output.value.split("\n").length,3);
+  assert.equal(p.output.value.split("\n").length,4);
   assert.equal(els.ledgerWork.style.display,"none");
   // Clear and Undo are atomic against the exact-output storage.
   dx=groups()[0].children[3].children[0];dx.checked=true;dx.events.change();
