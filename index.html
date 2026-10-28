@@ -410,6 +410,10 @@ function normalizeBetGrammarSeparators(s){
 function normalizeInput(s){
   s=stripInvisible(s).toLowerCase().trim();
   s=KTS_BUSINESS_ENGINE.normalizeCompactTicket(s);
+  // Approved MB wager shorthand: 'đau' before a stake is a spelling of 'đầu'.
+  // Scope this to a complete money atom; do not rewrite chat prose or raw
+  // Telegram evidence. Duplicate number groups remain fail-closed.
+  s=s.replace(/(^|\s)đau(?=\s*\d+(?:[.,]\d+)?[ndđ](?=\s|$))/giu,"$1đầu");
   // '+' giữa các đài chỉ là dấu phân cách.
   s=s.replace(/\s*\+\s*/gu," ");
   // Tên đài viết nguyên, có dấu hoặc không dấu -> mã chuẩn.
