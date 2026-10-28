@@ -78,6 +78,32 @@ function assertHalfUnitSplit(rules, amount, count) {
 
 async function main() {
   const rules = loadRules();
+
+  // Synthetic MB fixture: 'đau' is a narrowly
+  // stake-bound spelling for ĐẦU, but duplicates still need a money oracle.
+  const mbDauRaw="mb 10 dd 4n 21 32 b6n 43 đau 8n đuôi 12n 54 65 b10n";
+  const mbDauNormalized=rules.normalizeInput(mbDauRaw);
+  assert.match(mbDauNormalized,/43 đầu 8n đuôi 12n/u);
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(mbDauNormalized,"mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))));
+  assert.deepEqual(
+    Array.from(rules.engine.extractStakeOccurrences(mbDauNormalized)).filter(x=>x.selector==="DAU"||x.selector==="DUOI").map(x=>x.amount),
+    ["8n","12n"]
+  );
+  // Non-wager language stays verbatim after ordinary lowercase normalization.
+  assert.equal(rules.normalizeInput("Đau bụng 50n"),"đau bụng 50n");
+  assert.equal(rules.normalizeInput("98 đau buồn 50n"),"98 đau buồn 50n");
+  assert.equal(rules.normalizeInput("98 đau 50"),"98 đau 50");
+  const mbDuplicated90="mb 11 22 33 22 b6n 44 55 b10n";
+  expectThrow(
+    ()=>rules.validateCheckOnlyLine(mbDuplicated90,"mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))),
+    /trùng số 22/u
+  );
+  // Explicitly separate clauses MAY repeat 90; never guess that operator edit.
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(
+    "mb 11 22 33 b6n 22 b6n 44 55 b10n",
+    "mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))
+  ));
+
   for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61]) {
     for (const count of [2,3,4]) assertHalfUnitSplit(rules,amount,count);
   }
@@ -349,6 +375,22 @@ assert.match(html, /run\(\{preserveInputSelection:true\}\)/);
   assert.equal(manifest.scope, "./");
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /req\.mode === "navigate"/);
+
+
+  // Synthetic UI contract: accept corrected MB wager, but
+  // reject the two-line paste atomically when second line repeats 90.
+  const photoInputOne="mb 10 dd 4n 21 32 b6n 43 đau 8n đuôi 12n 54 65 b10n";
+  const photoInputTwo="mb 11 22 33 22 b6n 44 55 b10n";
+  const photoUI=rules.elements;
+  photoUI.region.value="mb"; photoUI.date.value="2026-10-28"; photoUI.today.checked=false;
+  photoUI.input.value=photoInputOne;
+  rules.run();
+  assert.match(photoUI.output.value,/43 đầu (?:8n|4n) đuôi (?:12n|6n)/u);
+  assert.ok(rules.getOutputRecords().length>0,"valid MB đầu/đuôi must materialize");
+  photoUI.input.value=photoInputOne+"\\n"+photoInputTwo;
+  rules.run();
+  assert.match(photoUI.output.value,/Dòng 2: trùng số 90/u);
+  assert.equal(rules.getOutputRecords().length,0,"invalid mixed MB chat must reject all outputs");
 
   console.log("HORIZONTAL RULES: PASS");
   console.log("DX/DA RULES: PASS");
