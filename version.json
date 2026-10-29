@@ -1,7 +1,7 @@
 {
-  "version": "1.0.30",
-  "updated": "2026-10-24",
+  "version": "1.0.31",
+  "updated": "2026-10-29",
   "app": "tach-dai-ngang",
-  "notes": "Ngang DX horizontal equal half-unit money 3n to 1.5n+1.5n; generated engine unchanged; candidate QA pending",
-  "business_engine_sha256": "046935677f9d88468b71246410444c27435c72e1415aeb359c799452584c36eb"
+  "notes": "Canonical duplicate-number confirmation gate; calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit.",
+  "business_engine_sha256": "0904f4ea660bcc801ef1bf5fb1a018cf4612110a69530e2344641bf46520dcfb"
 }

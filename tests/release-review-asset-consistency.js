@@ -5,13 +5,13 @@ const root=path.resolve(__dirname,".."),read=p=>fs.readFileSync(path.join(root,p
 const html=read("index.html"),sw=read("sw.js");
 const version=JSON.parse(read("version.json")),manifest=JSON.parse(read("manifest.webmanifest"));
 const engine=read("business_engine.generated.js");
-const V="1.0.30", SHA="046935677f9d88468b71246410444c27435c72e1415aeb359c799452584c36eb";
+const V="1.0.31", SHA="0904f4ea660bcc801ef1bf5fb1a018cf4612110a69530e2344641bf46520dcfb";
 assert.equal(version.version,V);
 assert.equal(version.business_engine_sha256,SHA);
 assert.ok(engine.includes(SHA));
 assert.ok(html.includes('const APP_VERSION = "'+V+'"'));
 assert.ok(html.includes("v"+V));
-assert.ok(sw.includes("tach-dai-ngang-v"+V+"-mb-dot-raw-guard"));
+assert.ok(sw.includes("tach-dai-ngang-v"+V+"-duplicate-number-confirmation"));
 assert.ok(sw.includes('JSON.stringify({version:"'+V+'"})'));
 assert.equal(manifest.start_url,"./index.html");
 assert.equal(manifest.scope,"./");
