@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.35-duplicate-number-confirmation";
+const CACHE_NAME = "tach-dai-ngang-v1.0.36-duplicate-number-confirmation";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.35"}), {
+        new Response(JSON.stringify({version:"1.0.36"}), {
           headers: { "Content-Type": "application/json" }
         })
       )
