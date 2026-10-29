@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,".."),read=p=>fs.readFileSync(path.join(root,p
 const html=read("index.html"),sw=read("sw.js");
 const version=JSON.parse(read("version.json")),manifest=JSON.parse(read("manifest.webmanifest"));
 const engine=read("business_engine.generated.js");
-const V="1.0.33", SHA="7952aa29eda4ba7117d0245ed71b79cf8f8643f291b94dbef268b710a4b849ea";
+const V="1.0.34", SHA="7952aa29eda4ba7117d0245ed71b79cf8f8643f291b94dbef268b710a4b849ea";
 assert.equal(version.version,V);
 assert.equal(version.business_engine_sha256,SHA);
 assert.ok(engine.includes(SHA));
