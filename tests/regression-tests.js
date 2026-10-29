@@ -33,6 +33,7 @@ function loadRules() {
   const clipboard = { text: "", async writeText(value) { this.text = value; } };
   const context = {
     crypto:require('node:crypto').webcrypto,TextEncoder,Uint8Array,
+    localStorage:(()=>{const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}})(),
     console, Set, Date, JSON, RegExp, String, Error,
     navigator: { clipboard },
     document: {
@@ -300,10 +301,11 @@ assert.deepEqual(
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
-  // Selecting both derived rows is source-equivalent and can be cut.
+  // Selecting both derived rows preserves the original in the exact ledger.
   ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n\n3d 38 b5n".length;
   await rules.cutSelectedOutput();
-  assert.equal(ui.input.value, "3d 68 xc 20n");
+  assert.match(ui.input.value,/^\[\[KTS_EXACT_OUTPUT_LEDGER_V1\]\]/u);
+  assert.equal(ui.output.value,"3d 68 xc 20n");
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
@@ -349,7 +351,8 @@ assert.deepEqual(
   ui.output.selectionStart = 0;
   ui.output.selectionEnd = ui.output.value.length;
   await rules.cutSelectedOutput();
-  assert.equal(ui.input.value, "");
+  assert.equal(JSON.parse(ui.input.value.split('\n').slice(1).join('\n')).origin,separatorMessage);
+  assert.equal(JSON.parse(ui.input.value.split('\n').slice(1).join('\n')).rows.length,0);
   assert.equal(ui.output.value, "");
   rules.triggerUndo();
   assert.equal(ui.input.value, separatorMessage);
