@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,".."),read=p=>fs.readFileSync(path.join(root,p
 const html=read("index.html"),sw=read("sw.js");
 const version=JSON.parse(read("version.json")),manifest=JSON.parse(read("manifest.webmanifest"));
 const engine=read("business_engine.generated.js");
-const V="1.0.36", SHA="7952aa29eda4ba7117d0245ed71b79cf8f8643f291b94dbef268b710a4b849ea";
+const V="1.0.37", SHA="7952aa29eda4ba7117d0245ed71b79cf8f8643f291b94dbef268b710a4b849ea";
 assert.equal(version.version,V);
 assert.equal(version.business_engine_sha256,SHA);
 assert.ok(engine.includes(SHA));
@@ -18,5 +18,5 @@ assert.equal(manifest.scope,"./");
 assert.ok(sw.includes('"./station_calendar.generated.js"'));
 assert.ok(sw.includes('"./business_engine.generated.js"'));
 assert.ok(sw.includes('cache.put("./index.html", copy)'));
-assert.ok(!html.includes("v1.0.26</span>"));
+assert.ok(!html.includes("v1.0.27</span>"));
 console.log("RELEASE REVIEW ASSET CONSISTENCY — NGANG PASS");
