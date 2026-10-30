@@ -30,19 +30,19 @@ async function activate(names){
 
 test('activation deletes only stale Ngang cache, not Mobile/Unified',async()=>{
   const names=[
-    'tach-dai-mobile-v2.0.36-duplicate-number-confirmation',
-    'kts-tach-unified-v1.0.25-duplicate-approval-7952aa',
+    'tach-dai-mobile-v2.0.38-duplicate-number-confirmation',
+    'kts-tach-unified-v1.0.27-duplicate-approval-7952aa',
     'tach-dai-ngang-v1.0.34-duplicate-number-confirmation',
-    'tach-dai-ngang-v1.0.36-duplicate-number-confirmation',
+    'tach-dai-ngang-v1.0.37-duplicate-number-confirmation',
     'other-unrelated-app-v9'
   ];
   assert.deepEqual(await activate(names),
     ['tach-dai-ngang-v1.0.34-duplicate-number-confirmation']);
 });
 test('activation with no stale Ngang cache never deletes another app',async()=>{
-  const names=['tach-dai-mobile-v2.0.36-duplicate-number-confirmation',
-    'kts-tach-unified-v1.0.25-duplicate-approval-7952aa',
-    'tach-dai-ngang-v1.0.36-duplicate-number-confirmation'];
+  const names=['tach-dai-mobile-v2.0.38-duplicate-number-confirmation',
+    'kts-tach-unified-v1.0.27-duplicate-approval-7952aa',
+    'tach-dai-ngang-v1.0.37-duplicate-number-confirmation'];
   assert.deepEqual(await activate(names),[]);
 });
 
@@ -52,13 +52,15 @@ test('multiple stale Ngang caches are cleared, near-match foreign cache remains'
     'tach-dai-ngang-v1.0.34-duplicate-number-confirmation',
     'tach-dai-ngang-v1.0.35-duplicate-number-confirmation',
     'tach-dai-ngang-v1.0.36-duplicate-number-confirmation',
+    'tach-dai-ngang-v1.0.37-duplicate-number-confirmation',
     'tach-dai-ngangcustom-v99',
-    'tach-dai-mobile-v2.0.36-duplicate-number-confirmation',
-    'kts-tach-unified-v1.0.25-duplicate-approval-7952aa'
+    'tach-dai-mobile-v2.0.38-duplicate-number-confirmation',
+    'kts-tach-unified-v1.0.27-duplicate-approval-7952aa'
   ];
   assert.deepEqual(await activate(names),[
     'tach-dai-ngang-v1.0.31-duplicate-number-confirmation',
     'tach-dai-ngang-v1.0.34-duplicate-number-confirmation',
-    'tach-dai-ngang-v1.0.35-duplicate-number-confirmation'
+    'tach-dai-ngang-v1.0.35-duplicate-number-confirmation',
+    'tach-dai-ngang-v1.0.36-duplicate-number-confirmation'
   ]);
 });
