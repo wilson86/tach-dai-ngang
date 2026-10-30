@@ -1,5 +1,5 @@
 {
-  "version": "1.0.36",
+  "version": "1.0.37",
   "updated": "2026-10-30",
   "app": "tach-dai-ngang",
   "notes": "Canonical duplicate-number confirmation gate; calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit.",
