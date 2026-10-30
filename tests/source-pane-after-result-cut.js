@@ -49,7 +49,9 @@ const cutCtx={
   serializeExactOutputLedger(){
     return prefix+JSON.stringify({origin,rows:cutCtx.outputRecords.filter(r=>r.alive).map(r=>({...r}))})
   },renderOutputRecords(){this.outputEl.value=this.outputRecords.filter(r=>r.alive).map(r=>r.text).join("\n")},
-  persistExactOutputLedger(){stored=this.inputEl.value},
+  // The real application requires an explicit true after durable storage.
+  // An undefined stub falsely invokes the rollback error path.
+  persistExactOutputLedger(){stored=this.inputEl.value;return true},
   announceWorkingSource(){announcements++},setStatus(){},
 };
 const cut=scopedFunction(source,"async function cutSelectedOutput(){",
@@ -65,7 +67,10 @@ async function testRoot(){
   assert.equal(announcements,1);
   assert.equal(cutCtx.outputEl.value,full[1].text,"only uncut result is visible");
   render();
-  assert.equal($("ledgerSourceView").value,origin,"source view must preserve all original physical lines");
+  assert.equal($("ledgerSourceView").value,full[1].text,
+    "working source shows ONLY surviving wagers after Cut");
+  assert.equal($("ledgerWorkOrigin").textContent,origin,
+    "immutable original chat and physical source lines remain visible in audit reference");
   assert.equal($("ledgerWork").style.display,"");
   assert.equal($("input").style.display,"none","internal ledger is never shown as an editable source ticket");
   assert.equal($("sourceCutBtn").style.display,"none","source Cut must not corrupt protected ledger");

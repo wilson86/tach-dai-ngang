@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.30-mb-dot-raw-guard-dx-horizontal-halfunit";
+const CACHE_NAME = "tach-dai-ngang-v1.0.37-duplicate-number-confirmation";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -18,7 +18,7 @@ self.addEventListener("install", event => {
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k.startsWith("tach-dai-ngang-") && k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.30"}), {
+        new Response(JSON.stringify({version:"1.0.37"}), {
           headers: { "Content-Type": "application/json" }
         })
       )

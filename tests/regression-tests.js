@@ -26,20 +26,23 @@ function loadRules() {
     addEventListener(type, handler) { this.events[type] = handler; },
     trigger(type) { return this.events[type]?.({ target: this }); },
     value: "", textContent: "", className: "", selectionStart: 0, selectionEnd: 0,
-    style: {}, focus() {}, select() { this.selectionStart = 0; this.selectionEnd = this.value.length; },
+    style: {}, focus() {}, closest() { return this; }, after() {}, append() {}, appendChild() {}, setAttribute() {},
+    select() { this.selectionStart = 0; this.selectionEnd = this.value.length; },
     setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }, remove() {}
   });
   const clipboard = { text: "", async writeText(value) { this.text = value; } };
   const context = {
+    crypto:require('node:crypto').webcrypto,TextEncoder,Uint8Array,
+    localStorage:(()=>{const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}})(),
     console, Set, Date, JSON, RegExp, String, Error,
     navigator: { clipboard },
     document: {
-      getElementById(id) { return elements[id] || (elements[id] = element()); },
+      getElementById(id) { if(id==="duplicateConfirmPanel"&&!elements[id])return null; return elements[id] || (elements[id] = element()); },
       createElement: element, body: { appendChild() {} }, execCommand() { return true; }
     }
   };
   vm.createContext(context);
-  vm.runInContext(`${calendar}\n${businessEngine}\n${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),engine:KTS_BUSINESS_ENGINE,elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
+  vm.runInContext(`${calendar}\n${businessEngine}\n${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),confirmDuplicate:()=>document.getElementById("duplicateConfirmBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),getWorkingLedger:()=>JSON.parse(JSON.stringify(workingLedger)),engine:KTS_BUSINESS_ENGINE,elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
   return context.__rules;
 }
 
@@ -78,6 +81,32 @@ function assertHalfUnitSplit(rules, amount, count) {
 
 async function main() {
   const rules = loadRules();
+
+  // Synthetic MB fixture: 'đau' is a narrowly
+  // stake-bound spelling for ĐẦU, but duplicates still need a money oracle.
+  const mbDauRaw="mb 10 dd 4n 21 32 b6n 43 đau 8n đuôi 12n 54 65 b10n";
+  const mbDauNormalized=rules.normalizeInput(mbDauRaw);
+  assert.match(mbDauNormalized,/43 đầu 8n đuôi 12n/u);
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(mbDauNormalized,"mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))));
+  assert.deepEqual(
+    Array.from(rules.engine.extractStakeOccurrences(mbDauNormalized)).filter(x=>x.selector==="DAU"||x.selector==="DUOI").map(x=>x.amount),
+    ["8n","12n"]
+  );
+  // Non-wager language stays verbatim after ordinary lowercase normalization.
+  assert.equal(rules.normalizeInput("Đau bụng 50n"),"đau bụng 50n");
+  assert.equal(rules.normalizeInput("98 đau buồn 50n"),"98 đau buồn 50n");
+  assert.equal(rules.normalizeInput("98 đau 50"),"98 đau 50");
+  const mbDuplicated90="mb 11 22 33 22 b6n 44 55 b10n";
+  expectThrow(
+    ()=>rules.validateCheckOnlyLine(mbDuplicated90,"mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))),
+    /^DUPLICATE_NUMBER_CONFIRM_REQUIRED:/u
+  );
+  // Explicitly separate clauses MAY repeat 90; never guess that operator edit.
+  assert.doesNotThrow(()=>rules.validateCheckOnlyLine(
+    "mb 11 22 33 b6n 22 b6n 44 55 b10n",
+    "mb",rules.getSchedule("mb",new Date("2026-10-28T12:00:00"))
+  ));
+
   for (const amount of [1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,9,9.5,10,10.5,61]) {
     for (const count of [2,3,4]) assertHalfUnitSplit(rules,amount,count);
   }
@@ -272,10 +301,11 @@ assert.deepEqual(
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
-  // Selecting both derived rows is source-equivalent and can be cut.
+  // Selecting both derived rows preserves the original in the exact ledger.
   ui.output.selectionStart = 0; ui.output.selectionEnd = "3d 38 b5n\n3d 38 b5n".length;
   await rules.cutSelectedOutput();
-  assert.equal(ui.input.value, "3d 68 xc 20n");
+  assert.match(ui.input.value,/^\[\[KTS_EXACT_OUTPUT_LEDGER_V1\]\]/u);
+  assert.equal(ui.output.value,"3d 68 xc 20n");
   rules.triggerUndo();
   assert.equal(ui.input.value, "3d 38 b10n\n3d 68 xc 20n");
   assert.equal(ui.output.value, "3d 38 b5n\n3d 38 b5n\n3d 68 xc 20n");
@@ -321,7 +351,8 @@ assert.deepEqual(
   ui.output.selectionStart = 0;
   ui.output.selectionEnd = ui.output.value.length;
   await rules.cutSelectedOutput();
-  assert.equal(ui.input.value, "");
+  assert.equal(JSON.parse(ui.input.value.split('\n').slice(1).join('\n')).origin,separatorMessage);
+  assert.equal(JSON.parse(ui.input.value.split('\n').slice(1).join('\n')).rows.length,0);
   assert.equal(ui.output.value, "");
   rules.triggerUndo();
   assert.equal(ui.input.value, separatorMessage);
@@ -349,6 +380,25 @@ assert.match(html, /run\(\{preserveInputSelection:true\}\)/);
   assert.equal(manifest.scope, "./");
   assert.match(sw, /self\.skipWaiting\(\)/);
   assert.match(sw, /req\.mode === "navigate"/);
+
+
+  // Synthetic UI contract: accept corrected MB wager, but
+  // reject the two-line paste atomically when second line repeats 90.
+  const photoInputOne="mb 10 dd 4n 21 32 b6n 43 đau 8n đuôi 12n 54 65 b10n";
+  const photoInputTwo="mb 11 22 33 22 b6n 44 55 b10n";
+  const photoUI=rules.elements;
+  photoUI.region.value="mb"; photoUI.date.value="2026-10-28"; photoUI.today.checked=false;
+  photoUI.input.value=photoInputOne;
+  rules.run();
+  assert.match(photoUI.output.value,/43 đầu (?:8n|4n) đuôi (?:12n|6n)/u);
+  assert.ok(rules.getOutputRecords().length>0,"valid MB đầu/đuôi must materialize");
+  photoUI.input.value=photoInputOne+"\n"+photoInputTwo;
+  rules.run();
+  assert.equal(photoUI.output.value,"XÁC NHẬN SỐ TRÙNG CẦN THIẾT");
+  assert.equal(rules.getOutputRecords().length,0,"unconfirmed duplicate must reject all outputs");
+  await rules.confirmDuplicate();
+  assert.ok(rules.getOutputRecords().length>0,"confirmed full source must materialize only after revalidation");
+  assert.deepEqual(rules.getWorkingLedger().duplicateConfirmation.physicalLines,[2]);
 
   console.log("HORIZONTAL RULES: PASS");
   console.log("DX/DA RULES: PASS");
