@@ -42,7 +42,7 @@ function loadRules() {
     }
   };
   vm.createContext(context);
-  vm.runInContext(`${calendar}\n${businessEngine}\n${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),confirmDuplicate:()=>document.getElementById("duplicateConfirmBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),getWorkingLedger:()=>JSON.parse(JSON.stringify(workingLedger)),engine:KTS_BUSINESS_ENGINE,elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
+  vm.runInContext(`${calendar}\n${businessEngine}\n${source}\nglobalThis.__rules={getSchedule,normalizeInput,preprocessChatText,validateCheckOnlyLine,processLine,distributeAmountExactly,auditMoneyConservation,run,cutSelectedOutput,triggerUndo:()=>document.getElementById("undoBtn").trigger("click"),confirmDuplicate:()=>document.getElementById("duplicateConfirmBtn").trigger("click"),getOutputRecords:()=>outputRecords.map(r=>({...r})),getWorkingLedger:()=>JSON.parse(JSON.stringify(workingLedger)),engine:KTS_BUSINESS_ENGINE,elements:{input:inputEl,output:outputEl,region:regionEl,date:dateEl,today:todayEl},clipboard:navigator.clipboard};`, context);
   return context.__rules;
 }
 
@@ -259,6 +259,18 @@ for(const source of ["2d 52 68 dx5n","tn ag 52 68 dx5n"]){
   assert.doesNotThrow(()=>rules.validateCheckOnlyLine(source,"mn",issue18Thursday));
   assert.ok(Array.from(rules.processLine(source,"mn",issue18Thursday)).length>0);
 }
+
+// Ngang is HORIZONTAL, not station-pair replicated full money. The
+// Thursday TN/AG two-number DX must conserve 5n as 2.5n + 2.5n.
+const ownerDxNgang=Array.from(rules.processLine("2d 52 68 dx5n","mn",issue18Thursday));
+assert.deepEqual(ownerDxNgang,["2d 52 68 dx2.5n","2d 52 68 dx2.5n"]);
+assert.deepEqual(
+  Array.from(rules.processLine("tn ag 52 68 dx5n","mn",issue18Thursday)),
+  ["tn ag 52 68 dx2.5n","tn ag 52 68 dx2.5n"]
+);
+assert.equal(totalStake(ownerDxNgang),5);
+assert.equal(rules.auditMoneyConservation("2d 52 68 dx5n",ownerDxNgang).status,"PASS");
+
 // A duplicate number DX is NOT an authorized distinct-number pair either.
 expectThrow(()=>rules.validateCheckOnlyLine("2d 52 52 dx5n","mn",issue18Thursday),/DUPLICATE_NUMBER_PAIR_INVALID/);
 
