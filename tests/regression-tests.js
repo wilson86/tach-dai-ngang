@@ -236,9 +236,12 @@ assert.deepEqual(
   Array.from(rules.processLine("Dna +qn 17 b5n", "mt", mtSaturday)),
   ["2d 17 b2n", "2d 17 b3n"]
 );
+// Owner Android correction 2026-10-31: singleton DX rejected in ALL modes.
+expectThrow(() => rules.validateCheckOnlyLine("Dna +qn 17 dx2n", "mt", mtSaturday), /DX_REQUIRES_AT_LEAST_TWO_NUMBERS/);
+expectThrow(() => rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday), /DX_REQUIRES_AT_LEAST_TWO_NUMBERS/);
 assert.deepEqual(
-  Array.from(rules.processLine("Dna +qn 17 dx2n", "mt", mtSaturday)),
-  ["dn qn 17 dx1n", "dn qn 17 dx1n"]
+  Array.from(rules.processLine("Dna +qn 17 71 dx2n", "mt", mtSaturday)),
+  ["dn qn 17 71 dx1n", "dn qn 17 71 dx1n"]
 );
 
 // DA/DAT Ngang: <5 unchanged, >=5 floor/ceil. DX splits equal half-unit money without changing numbers/stations.
