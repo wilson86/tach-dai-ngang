@@ -12,6 +12,12 @@ const businessEngine = fs.readFileSync(path.join(root, "business_engine.generate
 const sw = fs.readFileSync(path.join(root, "sw.js"), "utf8");
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.webmanifest"), "utf8"));
 const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
+const issue18StaleUpdateUi=html;
+assert.ok(issue18StaleUpdateUi.includes("HOLD: Engine chưa đồng bộ."),"stale engine must show update action");
+assert.ok(issue18StaleUpdateUi.includes("HOLD: Manifest/engine chưa đồng bộ."),"stale root version hash must show HOLD");
+assert.ok(issue18StaleUpdateUi.includes('if (res.ok) {'),"failed version fetch must not suppress service worker update");
+assert.ok(issue18StaleUpdateUi.includes("if (swRegistration) await swRegistration.update()"),"sw update should remain reachable");
+
 
 function loadRules(forceStaleEngine=false) {
   const match = html.match(/<script>\s*([\s\S]*?)<\/script>/i);
