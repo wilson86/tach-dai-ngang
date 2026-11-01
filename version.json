@@ -1,7 +1,7 @@
 {
-  "version": "1.0.37",
-  "updated": "2026-10-30",
+  "version": "1.0.38",
+  "updated": "2026-10-31",
   "app": "tach-dai-ngang",
-  "notes": "Canonical duplicate-number confirmation gate; calendar generated from KTS station_schedule_authority.json. Whole-number horizontal allocations use integer quotient/remainder; fractional source policy remains explicit.",
-  "business_engine_sha256": "7952aa29eda4ba7117d0245ed71b79cf8f8643f291b94dbef268b710a4b849ea"
+  "notes": "Issue #18 owner Android correction: literal DX/ĐX requires at least two distinct numbers. Valid two-number DX preserves horizontal money allocation, Cut/Undo and calendar scope.",
+  "business_engine_sha256": "0a0e541680405bd685a52225d637246064ef59a9715ea4afa72f750c9095e487"
 }
