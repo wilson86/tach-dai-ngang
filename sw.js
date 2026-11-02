@@ -1,9 +1,11 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.38-owner-singleton-dx-reject";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./station_calendar.generated.js",
   "./business_engine.generated.js",
+  "./clean-aggregate-review.js",
+  "./clean-aggregate-ui.js",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png"
@@ -37,7 +39,7 @@ self.addEventListener("fetch", event => {
   if (url.pathname.endsWith("/version.json") || url.pathname.endsWith("version.json")) {
     event.respondWith(
       fetch(req, { cache: "no-store" }).catch(() =>
-        new Response(JSON.stringify({version:"1.0.38"}), {
+        new Response(JSON.stringify({version:"1.0.39"}), {
           headers: { "Content-Type": "application/json" }
         })
       )
