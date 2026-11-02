@@ -1,7 +1,7 @@
 {
-  "version": "1.0.38",
-  "updated": "2026-10-31",
+  "version": "1.0.39",
+  "updated": "2026-11-02",
   "app": "tach-dai-ngang",
-  "notes": "Issue #18 owner Android correction: literal DX/ĐX requires at least two distinct numbers. Valid two-number DX preserves horizontal money allocation, Cut/Undo and calendar scope.",
+  "notes": "Issue #18 owner Android correction: literal DX/ĐX requires at least two distinct numbers. Valid two-number DX preserves horizontal money allocation, Cut/Undo and calendar scope. WIP optional Clean & Aggregate review: preserve every intentional repetition; ask operator before duplicate removal; no auto-forward.",
   "business_engine_sha256": "0a0e541680405bd685a52225d637246064ef59a9715ea4afa72f750c9095e487"
 }
