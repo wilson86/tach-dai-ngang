@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24b";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24c";
 const CORE_ASSETS = [
   "./",
   "./index.html",
