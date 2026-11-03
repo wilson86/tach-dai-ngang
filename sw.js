@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r17";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r18";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,7 @@ const CORE_ASSETS = [
   "./quyt-bao-review.js",
   "./quyt-bao-review-ui.js",
   "./customer-config-review.js",
+  "./customer-message-review.js",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png"
