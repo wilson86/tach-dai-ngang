@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24i-quyt-two-message-ticket-preview";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24k-quyt-copy-confirm-rate-guard";
 const CORE_ASSETS = [
   "./",
   "./index.html",
