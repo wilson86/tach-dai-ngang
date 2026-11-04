@@ -13,7 +13,7 @@ assert.equal(version.business_engine_sha256,SHA);
 assert.ok(engine.includes(SHA));
 assert.ok(html.includes('const APP_VERSION = "'+V+'"'));
 assert.ok(html.includes("v"+V));
-const CACHE="tach-dai-ngang-v"+V+"-owner-singleton-dx-reject-clean-r2-quyt-r24f-station-required-hold";
+const CACHE="tach-dai-ngang-v"+V+"-owner-singleton-dx-reject-clean-r2-quyt-r24g-calendar-named-station-preview";
 assert.equal((sw.match(/^const CACHE_NAME = "([^"]+)";$/mu)||[])[1],CACHE,
   "Ngang offline cache must identify the source-bound Quýt direct review build");
 assert.ok(html.includes('const EXPECTED_BUSINESS_ENGINE_SHA256="'+SHA+'"'),
