@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24g-calendar-named-station-preview";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24h-quyt-single-approval";
 const CORE_ASSETS = [
   "./",
   "./index.html",
