@@ -1,4 +1,4 @@
-const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24i-scope-error-refresh-balo-source-merge";
+const CACHE_NAME = "tach-dai-ngang-v1.0.39-owner-singleton-dx-reject-clean-r2-quyt-r24i-scope-error-refresh-balo-source-and-direct";
 const CORE_ASSETS = [
   "./",
   "./index.html",
