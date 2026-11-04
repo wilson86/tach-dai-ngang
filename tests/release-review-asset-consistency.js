@@ -13,7 +13,7 @@ assert.equal(version.business_engine_sha256,SHA);
 assert.ok(engine.includes(SHA));
 assert.ok(html.includes('const APP_VERSION = "'+V+'"'));
 assert.ok(html.includes("v"+V));
-const CACHE="tach-dai-ngang-v"+V+"-owner-singleton-dx-reject-clean-r2-quyt-r24i-scope-error-refresh-balo-source-and-direct";
+const CACHE="tach-dai-ngang-v"+V+"-owner-singleton-dx-reject-clean-r2-quyt-r24i-quyt-two-message-ticket-preview";
 assert.equal((sw.match(/^const CACHE_NAME = "([^"]+)";$/mu)||[])[1],CACHE,
   "Ngang offline cache must identify the source-bound Quýt direct review build");
 assert.ok(html.includes('const EXPECTED_BUSINESS_ENGINE_SHA256="'+SHA+'"'),
@@ -33,3 +33,8 @@ assert.ok(sw.includes('"./business_engine.generated.js"'));
 assert.ok(sw.includes('cache.put("./index.html", copy)'));
 assert.ok(!html.includes("v1.0.27</span>"));
 console.log("RELEASE REVIEW ASSET CONSISTENCY — NGANG PASS");
+
+for(const p of ['quyt-ticket-review.js','quyt-ticket-review-ui.js']){
+ assert.ok(html.includes('src="./'+p+'"'),'Ngang must load ticket review '+p);
+ assert.ok(sw.includes('"./'+p+'"'),'Ngang SW must cache ticket review '+p);
+}
